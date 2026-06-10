@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* استيراد خط Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* الوضع الافتراضي: دارك مود */
+:root {
+  --background: #0a0a0f;
+  --foreground: #e2e8f0;
+  --card: #111118;
+  --card-border: #1e1e2e;
+  --muted: #565f89;
+  --ig-pink: #E1306C;
+  --ig-purple: #833AB4;
+  --ig-orange: #F77737;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  direction: rtl;
+}
+
+/* تنسيق RTL */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* تمرير مخصص */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #833AB4, #E1306C);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #E1306C, #F77737);
+}
+
+/* تأثير التوهج للعناصر */
+.glow-pink {
+  box-shadow: 0 0 20px rgba(225, 48, 108, 0.3);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(131, 58, 180, 0.3);
+}
+
+/* تدرج إنستغرام */
+.ig-gradient {
+  background: linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D, #F56040, #F77737, #FCAF45, #FFDC80);
+}
+
+.ig-gradient-text {
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* تأثير زجاجي Glassmorphism */
+.glass {
+  background: rgba(17, 17, 24, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-hover {
+  transition: all 0.3s ease;
+}
+
+.glass-hover:hover {
+  background: rgba(30, 30, 46, 0.9);
+  border-color: rgba(131, 58, 180, 0.3);
+  transform: translateY(-2px);
+}
+
+/* أنيميشن الدخول */
+.animate-enter {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* حدود متدرجة */
+.gradient-border {
+  position: relative;
+  background: var(--card);
+  border-radius: 12px;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* تنسيق الإدخالات */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #111118 inset;
+  -webkit-text-fill-color: #e2e8f0;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Loading shimmer */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
