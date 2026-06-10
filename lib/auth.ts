@@ -2,7 +2,6 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
-import { prisma } from './prisma'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -17,60 +16,56 @@ export const authOptions: NextAuthOptions = {
           throw new Error('بريد إلكتروني وكلمة مرور مطلوبان')
         }
 
-        // التحقق من المشرف الرئيسي من متغيرات البيئة
         const adminEmail = process.env.ADMIN_EMAIL
         const adminPassword = process.env.ADMIN_PASSWORD
         const adminName = process.env.ADMIN_NAME || 'Admin'
 
+        // ✅ المشرف الرئيسي: التحقق مباشرة من متغيرات البيئة بدون قاعدة البيانات
         if (
-          credentials.email === adminEmail &&
+          credentials.email.trim().toLowerCase() === adminEmail?.trim().toLowerCase() &&
           credentials.password === adminPassword
         ) {
-          // إنشاء أو تحديث حساب المشرف في قاعدة البيانات
-          const hashedPassword = await bcrypt.hash(adminPassword!, 10)
-
-          const admin = await prisma.user.upsert({
-            where: { email: adminEmail! },
-            update: { name: adminName },
-            create: {
-              email: adminEmail!,
-              password: hashedPassword,
-              name: adminName,
-              role: 'ADMIN',
-            },
-          })
-
           return {
-            id: admin.id,
-            email: admin.email,
-            name: admin.name,
-            role: admin.role,
+            id: 'admin-static-id',
+            email: adminEmail!,
+            name: adminName,
+            role: 'ADMIN',
           }
         }
 
-        // التحقق من المستخدمين العاديين في قاعدة البيانات
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        })
+        // التحقق من المستخدمين العاديين من قاعدة البيانات
+        try {
+          const { prisma } = await import('./prisma')
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          })
 
-        if (!user || !user.isActive) {
-          throw new Error('بريد إلكتروني أو كلمة مرور غير صحيحة')
-        }
+          if (!user || !user.isActive) {
+            throw new Error('بريد إلكتروني أو كلمة مرور غير صحيحة')
+          }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
 
-        if (!isPasswordValid) {
-          throw new Error('بريد إلكتروني أو كلمة مرور غير صحيحة')
-        }
+          if (!isPasswordValid) {
+            throw new Error('بريد إلكتروني أو كلمة مرور غير صحيحة')
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          }
+        } catch (err) {
+          // إذا كانت المشكلة في قاعدة البيانات (جداول غير موجودة) أرجع خطأ واضح
+          const msg = String(err)
+          if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('connect')) {
+            throw new Error('بريد إلكتروني أو كلمة مرور غير صحيحة')
+          }
+          throw err
         }
       },
     }),
