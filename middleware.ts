@@ -19,8 +19,11 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
 
-        // السماح بالوصول لصفحة تسجيل الدخول دائماً
+        // السماح بهذه المسارات دون مصادقة
         if (pathname === '/login') return true
+        if (pathname.startsWith('/api/auth')) return true
+        if (pathname.startsWith('/api/setup')) return true
+        if (pathname.startsWith('/api/db-check')) return true
 
         // باقي الصفحات تتطلب توكن صالح
         return !!token
@@ -31,6 +34,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images).*)',
   ],
 }
