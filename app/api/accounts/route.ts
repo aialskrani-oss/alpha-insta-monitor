@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { fetchInstagramProfile } from '@/lib/instagram'
-
 // جلب كافة الحسابات
 export async function GET(req: NextRequest) {
   try {
@@ -56,7 +54,13 @@ export async function POST(req: NextRequest) {
     }
 
     // محاولة جلب بيانات الحساب من Instagram
-    const accountData = await fetchInstagramProfile(clean)
+    // جلب بيانات أولية — يحتاج Apify Token من الإعدادات
+      const settings = await prisma.settings.findFirst()
+      let accountData = null
+      if (settings?.apifyApiToken) {
+        const { fetchInstagramProfile } = await import('@/lib/instagram')
+        accountData = await fetchInstagramProfile(clean, settings.apifyApiToken).catch(() => null)
+      }
 
     const account = await prisma.account.create({
       data: {
