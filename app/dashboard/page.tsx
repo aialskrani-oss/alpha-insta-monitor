@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Users, UserCheck, TrendingUp, FileText, Eye } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { MonitorChart } from '@/components/dashboard/MonitorChart'
-import { RecentActivity } from '@/components/dashboard/RecentActivity'
+import RecentActivity from '@/components/dashboard/RecentActivity'
 import type { DashboardStats } from '@/types'
 
 export default function DashboardPage() {
