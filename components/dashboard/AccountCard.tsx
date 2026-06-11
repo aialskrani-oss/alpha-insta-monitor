@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2, Power, ExternalLink, Users, FileText, UserCheck, RefreshCw } from 'lucide-react'
+import { Trash2, Power, ExternalLink, Users, FileText, UserCheck, RefreshCw, Edit2, Check, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatNumber, getStatusText, timeAgo } from '@/lib/utils'
@@ -21,10 +21,13 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
   const [loadingToggle, setLoadingToggle] = useState(false)
   const [loadingSync, setLoadingSync] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [manualFollowers, setManualFollowers] = useState(String(account.followers))
+  const [manualFollowing, setManualFollowing] = useState(String(account.following))
+  const [manualPosts, setManualPosts] = useState(String(account.posts))
 
   const handleDelete = async () => {
     if (!confirm(`هل أنت متأكد من حذف حساب @${account.username}؟`)) return
-
     setLoadingDelete(true)
     try {
       const res = await fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
@@ -50,7 +53,7 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
         body: JSON.stringify({ isTracked: !account.isTracked }),
       })
       if (res.ok) {
-        toast.success(account.isTracked ? `تم إيقاف مراقبة @${account.username}` : `تم تشغيل مراقبة @${account.username}`)
+        toast.success(account.isTracked ? `إيقاف @${account.username}` : `تشغيل @${account.username}`)
         onToggleTracking(account.id, !account.isTracked)
       } else {
         toast.error('فشل تغيير الحالة')
@@ -67,12 +70,15 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
     try {
       const res = await fetch(`/api/accounts/${account.id}/sync`, { method: 'POST' })
       const data = await res.json()
-
       if (data.success) {
-        toast.success(data.message || 'تم تحديث البيانات ✅')
+        toast.success(data.message || '✅ تم التحديث من Instagram')
         onUpdate?.(account.id, data.data)
+        setManualFollowers(String(data.data?.followers ?? account.followers))
+        setManualFollowing(String(data.data?.following ?? account.following))
+        setManualPosts(String(data.data?.posts ?? account.posts))
       } else if (data.partial) {
-        toast.warning(data.error || 'تعذّر الاتصال بـ Instagram')
+        toast.warning('Instagram محجوب من الخادم — استخدم التحديث اليدوي 👇')
+        setEditMode(true)
       } else {
         toast.error(data.error || 'فشل المزامنة')
       }
@@ -80,6 +86,30 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
       toast.error('خطأ في الاتصال')
     } finally {
       setLoadingSync(false)
+    }
+  }
+
+  const handleManualSave = async () => {
+    const followers = parseInt(manualFollowers) || 0
+    const following = parseInt(manualFollowing) || 0
+    const posts = parseInt(manualPosts) || 0
+
+    try {
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followers, following, posts }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('✅ تم حفظ البيانات')
+        onUpdate?.(account.id, { followers, following, posts })
+        setEditMode(false)
+      } else {
+        toast.error('فشل الحفظ')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
     }
   }
 
@@ -143,63 +173,112 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
             </a>
           </div>
 
-          {/* زر مزامنة سريع */}
-          <button
-            onClick={handleSync}
-            disabled={loadingSync}
-            className="shrink-0 p-1.5 rounded-lg text-cyber-muted hover:text-ig-purple hover:bg-ig-purple/10 transition-all disabled:opacity-40"
-            title="مزامنة من Instagram"
-          >
-            <RefreshCw size={13} className={loadingSync ? 'animate-spin' : ''} />
-          </button>
+          {/* أزرار الرأس */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => { setEditMode(!editMode); setManualFollowers(String(account.followers)); setManualFollowing(String(account.following)); setManualPosts(String(account.posts)); }}
+              className="p-1.5 rounded-lg text-cyber-muted hover:text-ig-purple hover:bg-ig-purple/10 transition-all"
+              title="تحديث يدوي"
+            >
+              <Edit2 size={12} />
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={loadingSync}
+              className="p-1.5 rounded-lg text-cyber-muted hover:text-ig-purple hover:bg-ig-purple/10 transition-all disabled:opacity-40"
+              title="مزامنة من Instagram"
+            >
+              <RefreshCw size={13} className={loadingSync ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
-        {/* الإحصائيات */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {[
-            { label: 'متابعون', value: account.followers, icon: <Users size={12} /> },
-            { label: 'يتابع', value: account.following, icon: <UserCheck size={12} /> },
-            { label: 'منشورات', value: account.posts, icon: <FileText size={12} /> },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-cyber-card rounded-lg p-2 text-center border border-cyber-border">
-              <div className="flex items-center justify-center gap-1 text-cyber-muted mb-1">
-                {stat.icon}
-              </div>
-              <p className="text-sm font-bold text-cyber-text">{formatNumber(stat.value)}</p>
-              <p className="text-[10px] text-cyber-muted">{stat.label}</p>
+        {/* الإحصائيات - عادي أو وضع تعديل */}
+        {editMode ? (
+          <div className="space-y-2 mb-4">
+            <p className="text-[10px] text-ig-purple font-medium">✏️ أدخل القيم يدوياً:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'متابعون', value: manualFollowers, set: setManualFollowers },
+                { label: 'يتابع', value: manualFollowing, set: setManualFollowing },
+                { label: 'منشورات', value: manualPosts, set: setManualPosts },
+              ].map(({ label, value, set }) => (
+                <div key={label} className="flex flex-col gap-1">
+                  <label className="text-[10px] text-cyber-muted">{label}</label>
+                  <input
+                    type="number"
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    className="w-full bg-cyber-bg border border-ig-purple/30 rounded-lg px-2 py-1.5 text-xs text-cyber-text focus:outline-none focus:border-ig-purple text-center"
+                    min="0"
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleManualSave}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-ig-purple/20 text-ig-purple text-xs hover:bg-ig-purple/30 transition-all"
+              >
+                <Check size={12} /> حفظ
+              </button>
+              <button
+                onClick={() => setEditMode(false)}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-cyber-border text-cyber-muted text-xs hover:bg-cyber-card transition-all"
+              >
+                <X size={12} /> إلغاء
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[
+              { label: 'متابعون', value: account.followers, icon: <Users size={12} /> },
+              { label: 'يتابع', value: account.following, icon: <UserCheck size={12} /> },
+              { label: 'منشورات', value: account.posts, icon: <FileText size={12} /> },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-cyber-card rounded-lg p-2 text-center border border-cyber-border">
+                <div className="flex items-center justify-center gap-1 text-cyber-muted mb-1">
+                  {stat.icon}
+                </div>
+                <p className="text-sm font-bold text-cyber-text">{formatNumber(stat.value)}</p>
+                <p className="text-[10px] text-cyber-muted">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* آخر فحص */}
-        {account.lastChecked && (
+        {!editMode && account.lastChecked && (
           <p className="text-xs text-cyber-muted mb-4">
             آخر تحديث: {timeAgo(account.lastChecked)}
           </p>
         )}
 
         {/* أزرار الإجراءات */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant={account.isTracked ? 'secondary' : 'primary'}
-            size="sm"
-            onClick={handleToggle}
-            loading={loadingToggle}
-            icon={<Power size={14} />}
-            className="flex-1 text-xs"
-          >
-            {account.isTracked ? 'إيقاف' : 'تشغيل'}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleDelete}
-            loading={loadingDelete}
-            icon={<Trash2 size={14} />}
-          >
-            حذف
-          </Button>
-        </div>
+        {!editMode && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant={account.isTracked ? 'secondary' : 'primary'}
+              size="sm"
+              onClick={handleToggle}
+              loading={loadingToggle}
+              icon={<Power size={14} />}
+              className="flex-1 text-xs"
+            >
+              {account.isTracked ? 'إيقاف' : 'تشغيل'}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDelete}
+              loading={loadingDelete}
+              icon={<Trash2 size={14} />}
+            >
+              حذف
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
