@@ -11,12 +11,9 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.fna.fbcdn.net' },
       { protocol: 'https', hostname: 'i.pravatar.cc' },
     ],
-    // السماح بكل النطاقات الخارجية (احتياطي)
     dangerouslyAllowSVG: true,
   },
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
-  },
+  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
 }
 
 module.exports = nextConfig
