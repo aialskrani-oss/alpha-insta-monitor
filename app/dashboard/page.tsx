@@ -88,7 +88,7 @@ export default function DashboardPage() {
       </div>
 
       {/* أكثر الحسابات متابعة */}
-      {stats?.topAccounts && stats.topAccounts.length > 0 && (
+      {stats?.topAccounts && (stats.topAccounts?.length ?? 0) > 0 && (
         <div className="glass rounded-xl p-5 border border-cyber-border">
           <h3 className="text-sm font-semibold text-cyber-text mb-4 flex items-center gap-2">
             <UserCheck size={16} className="text-ig-purple" />
@@ -112,7 +112,7 @@ export default function DashboardPage() {
                       <div
                         className="h-full ig-gradient rounded-full"
                         style={{
-                          width: `${Math.min(100, (account.followers / (stats.topAccounts[0]?.followers || 1)) * 100)}%`
+                          width: `${Math.min(100, (account.followers / ((stats.topAccounts ?? [])[0]?.followers || 1)) * 100)}%`
                         }}
                       />
                     </div>
