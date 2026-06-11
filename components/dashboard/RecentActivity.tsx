@@ -1,13 +1,20 @@
+import React from 'react'
 // مكوّن آخر النشاطات والأحداث
 import { Card, CardHeader } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { Activity as ActivityIcon, TrendingUp, TrendingDown, FileText, User, AlertCircle } from 'lucide-react'
+import { Activity as ActivityIcon, TrendingUp, TrendingDown, FileText, User, AlertCircle, Play } from 'lucide-react'
 import { timeAgo, getActivityText } from '@/lib/utils'
 import type { Activity } from '@/types'
 
-const activityConfig = {
-  FOLLOWER_GAIN: {
-    icon: <TrendingUp size={14} />,
+const activityConfig: Record<string, { icon: React.ReactNode; variant: string }> = {
+    FOLLOWER_GAIN: { icon: <TrendingUp size={14} />, variant: 'success' },
+    FOLLOWER_LOSS: { icon: <TrendingDown size={14} />, variant: 'danger' },
+    NEW_POST: { icon: <FileText size={14} />, variant: 'info' },
+    NEW_STORY: { icon: <Play size={14} />, variant: 'purple' },
+    PROFILE_CHANGE: { icon: <User size={14} />, variant: 'warning' },
+    STATUS_CHANGE: { icon: <ActivityIcon size={14} />, variant: 'purple' },
+    ERROR: { icon: <AlertCircle size={14} />, variant: 'danger' },
+  } />,
     variant: 'success' as const,
   },
   FOLLOWER_LOSS: {
