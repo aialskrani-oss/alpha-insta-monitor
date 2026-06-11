@@ -84,5 +84,16 @@
     totalPosts: number
     followerGrowth?: number
     recentActivities: Activity[]
+    topAccounts?: Array<{
+      id: string
+      username: string
+      fullName?: string
+      avatar?: string
+      followers: number
+      following: number
+      posts: number
+      isTracked: boolean
+      status: string
+    }>
   }
   
