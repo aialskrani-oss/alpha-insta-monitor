@@ -1,115 +1,101 @@
 // Prisma Schema - Alpha Insta Monitor
-generator client {
-  provider = "prisma-client-js"
-}
+  generator client {
+    provider = "prisma-client-js"
+  }
 
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL")
-}
+  datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DATABASE_URL")
+  }
 
-// نموذج المستخدمين
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  password     String
-  name         String
-  role         String   @default("USER")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  usedCodeId   String?
+  model User {
+    id         String   @id @default(cuid())
+    email      String   @unique
+    password   String
+    name       String
+    role       String   @default("USER")
+    isActive   Boolean  @default(true)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    usedCodeId String?
+    accounts      Account[]
+    referralCodes ReferralCode[] @relation("CodeCreator")
+    @@map("users")
+  }
 
-  // العلاقات
-  accounts      Account[]
-  referralCodes ReferralCode[] @relation("CodeCreator")
+  model Account {
+    id          String    @id @default(cuid())
+    username    String    @unique
+    fullName    String?
+    avatar      String?
+    bio         String?
+    followers   Int       @default(0)
+    following   Int       @default(0)
+    posts       Int       @default(0)
+    isTracked   Boolean   @default(true)
+    status      String    @default("ACTIVE")
+    lastChecked DateTime?
+    lastPostId          String?
+    lastPostTime        DateTime?
+    lastStoryId         String?
+    lastStoryTime       DateTime?
+    followersAtLastSync Int @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    userId     String
+    user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    activities Activity[]
+    snapshots  FollowerSnapshot[]
+    @@map("accounts")
+  }
 
-  @@map("users")
-}
+  model Activity {
+    id        String   @id @default(cuid())
+    type      String
+    message   String
+    data      Json?
+    createdAt DateTime @default(now())
+    accountId String
+    account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    @@map("activities")
+  }
 
-// نموذج حسابات إنستغرام
-model Account {
-  id          String    @id @default(cuid())
-  username    String    @unique
-  fullName    String?
-  avatar      String?
-  bio         String?
-  followers   Int       @default(0)
-  following   Int       @default(0)
-  posts       Int       @default(0)
-  isTracked   Boolean   @default(true)
-  status      String    @default("ACTIVE")
-  lastChecked DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  model FollowerSnapshot {
+    id         String   @id @default(cuid())
+    followers  Int
+    following  Int
+    posts      Int
+    recordedAt DateTime @default(now())
+    accountId String
+    account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    @@map("follower_snapshots")
+  }
 
-  // العلاقات
-  userId    String
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activities Activity[]
-  snapshots  FollowerSnapshot[]
+  model ReferralCode {
+    id        String    @id @default(cuid())
+    code      String    @unique
+    isUsed    Boolean   @default(false)
+    expiresAt DateTime?
+    createdAt DateTime  @default(now())
+    creatorId String
+    creator   User   @relation("CodeCreator", fields: [creatorId], references: [id])
+    @@map("referral_codes")
+  }
 
-  @@map("accounts")
-}
-
-// سجل النشاطات
-model Activity {
-  id        String   @id @default(cuid())
-  type      String
-  message   String
-  data      Json?
-  createdAt DateTime @default(now())
-
-  // العلاقات
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@map("activities")
-}
-
-// لقطات المتابعين للرسوم البيانية
-model FollowerSnapshot {
-  id         String   @id @default(cuid())
-  followers  Int
-  following  Int
-  posts      Int
-  recordedAt DateTime @default(now())
-
-  // العلاقات
-  accountId String
-  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@map("follower_snapshots")
-}
-
-// نموذج أكواد الإحالة
-model ReferralCode {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  isUsed    Boolean   @default(false)
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
-
-  // العلاقات
-  creatorId String
-  creator   User   @relation("CodeCreator", fields: [creatorId], references: [id])
-
-  @@map("referral_codes")
-}
-
-// إعدادات التطبيق
-model Settings {
-  id                String   @id @default(cuid())
-  telegramBotToken  String?
-  telegramChatId    String?
-  webhookUrl        String?
-  webhookEnabled    Boolean  @default(false)
-  notifyOnFollow    Boolean  @default(true)
-  notifyOnUnfollow  Boolean  @default(true)
-  notifyOnNewPost   Boolean  @default(true)
-  checkIntervalMins Int      @default(60)
-  updatedAt         DateTime @updatedAt
-
-  @@map("settings")
-}
+  model Settings {
+    id                String   @id @default(cuid())
+    telegramBotToken  String?
+    telegramChatId    String?
+    apifyApiToken     String?
+    webhookUrl        String?
+    webhookEnabled    Boolean  @default(false)
+    notifyOnFollow    Boolean  @default(true)
+    notifyOnUnfollow  Boolean  @default(true)
+    notifyOnNewPost   Boolean  @default(true)
+    notifyOnNewStory  Boolean  @default(true)
+    notifyOnBioChange Boolean  @default(false)
+    checkIntervalMins Int      @default(30)
+    updatedAt         DateTime @updatedAt
+    @@map("settings")
+  }
