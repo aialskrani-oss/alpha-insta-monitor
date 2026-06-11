@@ -15,12 +15,13 @@ export async function GET(req: NextRequest) {
         data: { webhookEnabled: false, notifyOnFollow: true, notifyOnUnfollow: true, notifyOnNewPost: true, notifyOnNewStory: true, notifyOnBioChange: false, checkIntervalMins: 30 },
       })
     }
+    const effectiveApifyToken = settings.apifyApiToken || (process.env.APIFY_API_TOKEN ? process.env.APIFY_API_TOKEN : null)
     return NextResponse.json({
       success: true,
       data: {
         ...settings,
         telegramBotToken: settings.telegramBotToken ? '****' + settings.telegramBotToken.slice(-6) : null,
-        apifyApiToken: settings.apifyApiToken ? '****' + settings.apifyApiToken.slice(-6) : null,
+        apifyApiToken: effectiveApifyToken ? '****' + effectiveApifyToken.slice(-6) : null,
       },
     })
   } catch { return NextResponse.json({ success: false, error: 'خطأ' }, { status: 500 }) }
