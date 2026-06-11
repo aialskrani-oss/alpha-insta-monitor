@@ -1,5 +1,8 @@
 {
-  "buildCommand": "prisma generate && next build",
-  "framework": "nextjs",
-  "regions": ["iad1"]
+  "crons": [
+    {
+      "path": "/api/cron/monitor",
+      "schedule": "*/30 * * * *"
+    }
+  ]
 }
