@@ -64,7 +64,7 @@
       }
       const sent = await sendTelegramMessage(
         settings.telegramBotToken, settings.telegramChatId,
-        `🔔 <b>Alpha Insta Monitor</b>\n\n✅ الاختبار ناجح! النظام يعمل بشكل صحيح.\n\n📊 ستصلك إشعارات عند:\n📈 زيادة المتابعين\n📉 نقصان المتابعين\n📸 منشور جديد\n🔴 ستوري جديدة`
+        `🔔 <b>Alpha Insta Monitor</b>\n\n✅ الاختبار ناجح! النظام يعمل.\n\n📊 ستصلك إشعارات عند:\n📈 زيادة المتابعين\n📉 نقصان المتابعين\n📸 منشور جديد\n🔴 ستوري جديدة`
       )
       if (sent) return NextResponse.json({ success: true, message: 'تم الإرسال 🎉' })
       return NextResponse.json({ success: false, error: 'فشل الإرسال — تحقق من التوكن والـ Chat ID' }, { status: 400 })
