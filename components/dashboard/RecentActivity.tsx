@@ -1,100 +1,75 @@
-import React from 'react'
-// مكوّن آخر النشاطات والأحداث
-import { Card, CardHeader } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Activity as ActivityIcon, TrendingUp, TrendingDown, FileText, User, AlertCircle, Play } from 'lucide-react'
-import { timeAgo, getActivityText } from '@/lib/utils'
-import type { Activity } from '@/types'
+'use client'
+  // مكوّن آخر النشاطات والأحداث
+  import React from 'react'
+  import { Activity as ActivityIcon, TrendingUp, TrendingDown, FileText, User, AlertCircle, Play } from 'lucide-react'
+  import { Activity } from '@/types'
 
-const activityConfig: Record<string, { icon: React.ReactNode; variant: string }> = {
-    FOLLOWER_GAIN: { icon: <TrendingUp size={14} />, variant: 'success' },
-    FOLLOWER_LOSS: { icon: <TrendingDown size={14} />, variant: 'danger' },
-    NEW_POST: { icon: <FileText size={14} />, variant: 'info' },
-    NEW_STORY: { icon: <Play size={14} />, variant: 'purple' },
-    PROFILE_CHANGE: { icon: <User size={14} />, variant: 'warning' },
-    STATUS_CHANGE: { icon: <ActivityIcon size={14} />, variant: 'purple' },
-    ERROR: { icon: <AlertCircle size={14} />, variant: 'danger' },
-  } />,
-    variant: 'success' as const,
-  },
-  FOLLOWER_LOSS: {
-    icon: <TrendingDown size={14} />,
-    variant: 'danger' as const,
-  },
-  NEW_POST: {
-    icon: <FileText size={14} />,
-    variant: 'info' as const,
-  },
-  PROFILE_CHANGE: {
-    icon: <User size={14} />,
-    variant: 'warning' as const,
-  },
-  STATUS_CHANGE: {
-    icon: <ActivityIcon size={14} />,
-    variant: 'purple' as const,
-  },
-  ERROR: {
-    icon: <AlertCircle size={14} />,
-    variant: 'danger' as const,
-  },
-}
+  interface RecentActivityProps {
+    activities: Activity[]
+  }
 
-interface RecentActivityProps {
-  activities: Activity[]
-  loading?: boolean
-}
+  function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'الآن'
+    if (mins < 60) return `منذ ${mins} دقيقة`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `منذ ${hours} ساعة`
+    const days = Math.floor(hours / 24)
+    return `منذ ${days} يوم`
+  }
 
-export function RecentActivity({ activities, loading = false }: RecentActivityProps) {
-  return (
-    <Card>
-      <CardHeader
-        title="آخر النشاطات"
-        icon={<ActivityIcon size={16} />}
-        subtitle={`${activities.length} حدث`}
-      />
+  const activityConfig: Record<string, { icon: React.ReactNode; color: string }> = {
+    FOLLOWER_GAIN: { icon: <TrendingUp size={14} />, color: 'text-green-400 bg-green-400/10' },
+    FOLLOWER_LOSS: { icon: <TrendingDown size={14} />, color: 'text-red-400 bg-red-400/10' },
+    NEW_POST: { icon: <FileText size={14} />, color: 'text-blue-400 bg-blue-400/10' },
+    NEW_STORY: { icon: <Play size={14} />, color: 'text-purple-400 bg-purple-400/10' },
+    PROFILE_CHANGE: { icon: <User size={14} />, color: 'text-yellow-400 bg-yellow-400/10' },
+    STATUS_CHANGE: { icon: <ActivityIcon size={14} />, color: 'text-purple-400 bg-purple-400/10' },
+    ERROR: { icon: <AlertCircle size={14} />, color: 'text-red-400 bg-red-400/10' },
+  }
 
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex gap-3 animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-cyber-border shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-cyber-border rounded w-3/4" />
-                <div className="h-3 bg-cyber-border rounded w-1/2" />
-              </div>
-            </div>
-          ))}
+  export default function RecentActivity({ activities }: RecentActivityProps) {
+    if (activities.length === 0) {
+      return (
+        <div className="glass rounded-xl border border-cyber-border p-5">
+          <h3 className="text-sm font-semibold text-cyber-text mb-4 flex items-center gap-2">
+            <ActivityIcon size={16} className="text-ig-purple" />
+            آخر النشاطات
+          </h3>
+          <div className="text-center py-8 text-cyber-muted text-sm">
+            <ActivityIcon size={32} className="mx-auto mb-2 opacity-30" />
+            <p>لا توجد نشاطات بعد</p>
+            <p className="text-xs mt-1 opacity-70">ستظهر هنا عند بدء المراقبة</p>
+          </div>
         </div>
-      ) : activities.length === 0 ? (
-        <div className="text-center py-8">
-          <ActivityIcon size={32} className="text-cyber-muted mx-auto mb-2 opacity-50" />
-          <p className="text-sm text-cyber-muted">لا توجد نشاطات بعد</p>
-        </div>
-      ) : (
+      )
+    }
+
+    return (
+      <div className="glass rounded-xl border border-cyber-border p-5">
+        <h3 className="text-sm font-semibold text-cyber-text mb-4 flex items-center gap-2">
+          <ActivityIcon size={16} className="text-ig-purple" />
+          آخر النشاطات
+          <span className="mr-auto text-xs text-cyber-muted font-normal">{activities.length} حدث</span>
+        </h3>
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {activities.map((activity) => {
             const config = activityConfig[activity.type] || activityConfig.STATUS_CHANGE
             return (
               <div key={activity.id} className="flex items-start gap-3 group">
-                {/* أيقونة النوع */}
-                <div className="mt-0.5 shrink-0">
-                  <Badge variant={config.variant} size="sm">
-                    {config.icon}
-                  </Badge>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${config.color}`}>
+                  {config.icon}
                 </div>
-
-                {/* المحتوى */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-cyber-text leading-relaxed line-clamp-2">
-                    {activity.message}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {activity.account?.username && (
-                      <span className="text-[10px] text-ig-purple font-medium">
-                        @{activity.account.username}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-cyber-muted">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      {activity.account && (
+                        <span className="text-xs font-medium text-ig-purple">@{activity.account.username} </span>
+                      )}
+                      <span className="text-xs text-cyber-text">{activity.message}</span>
+                    </div>
+                    <span className="text-xs text-cyber-muted whitespace-nowrap shrink-0">
                       {timeAgo(activity.createdAt)}
                     </span>
                   </div>
@@ -103,7 +78,6 @@ export function RecentActivity({ activities, loading = false }: RecentActivityPr
             )
           })}
         </div>
-      )}
-    </Card>
-  )
-}
+      </div>
+    )
+  }
