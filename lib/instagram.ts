@@ -1,129 +1,158 @@
-// مكتبة جلب بيانات Instagram - تجرب proxies متعددة
-export interface InstagramProfile {
-  fullName: string
-  avatar: string | null
-  bio: string | null
-  followers: number
-  following: number
-  posts: number
-  isPrivate: boolean
-}
-
-export async function fetchInstagramProfile(username: string): Promise<InstagramProfile | null> {
-  const proxies = [
-    `https://corsproxy.io/?url=${encodeURIComponent(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`)}`,
-    `https://api.codetabs.com/v1/proxy?quest=https://www.instagram.com/${username}/?__a=1%26__d=dis`,
-  ]
-
-  // الطريقة 1: Instagram Internal API مباشرة
-  try {
-    const res = await fetch(
-      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
-      {
-        headers: {
-          'User-Agent': 'Instagram 275.0.0.27.98 Android',
-          'x-ig-app-id': '936619743392459',
-          'Accept': '*/*',
-          'Accept-Language': 'ar,en;q=0.9',
-          'Origin': 'https://www.instagram.com',
-          'Referer': `https://www.instagram.com/${username}/`,
-        },
-        signal: AbortSignal.timeout(7000),
-      }
-    )
-    if (res.ok) {
-      const json = await res.json()
-      const user = json?.data?.user
-      if (user?.edge_followed_by) {
-        return buildProfile(user, username)
-      }
-    }
-  } catch { /* continue */ }
-
-  // الطريقة 2: corsproxy.io
-  try {
-    const res = await fetch(proxies[0], {
-      headers: { 'x-ig-app-id': '936619743392459' },
-      signal: AbortSignal.timeout(10000),
-    })
-    if (res.ok) {
-      const text = await res.text()
-      const json = JSON.parse(text)
-      const user = json?.data?.user || json?.graphql?.user
-      if (user?.edge_followed_by || user?.follower_count) {
-        return buildProfile(user, username)
-      }
-    }
-  } catch { /* continue */ }
-
-  // الطريقة 3: allorigins + HTML parsing
-  try {
-    const res = await fetch(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.instagram.com/${username}/`)}`,
-      { signal: AbortSignal.timeout(15000) }
-    )
-    if (res.ok) {
-      const data = await res.json()
-      const html: string = data?.contents || ''
-      const parsed = parseInstagramHTML(html, username)
-      if (parsed) return parsed
-    }
-  } catch { /* continue */ }
-
-  // الطريقة 4: jsonp.afeld.me proxy
-  try {
-    const res = await fetch(
-      `https://jsonp.afeld.me/?url=${encodeURIComponent(`https://www.instagram.com/${username}/?__a=1&__d=dis`)}`,
-      { signal: AbortSignal.timeout(8000) }
-    )
-    if (res.ok) {
-      const json = await res.json()
-      const user = json?.graphql?.user
-      if (user) return buildProfile(user, username)
-    }
-  } catch { /* continue */ }
-
-  return null
-}
-
-function buildProfile(user: Record<string, unknown>, username: string): InstagramProfile {
-  return {
-    fullName: (user.full_name as string) || username,
-    avatar: (user.profile_pic_url_hd as string) || (user.profile_pic_url as string) || null,
-    bio: (user.biography as string) || null,
-    followers: (user.edge_followed_by as { count: number })?.count ??
-               (user.follower_count as number) ?? 0,
-    following: (user.edge_follow as { count: number })?.count ??
-               (user.following_count as number) ?? 0,
-    posts: (user.edge_owner_to_timeline_media as { count: number })?.count ??
-           (user.media_count as number) ?? 0,
-    isPrivate: (user.is_private as boolean) ?? false,
+// مكتبة جلب بيانات Instagram عبر Apify
+  export interface InstagramProfile {
+    fullName: string
+    avatar: string | null
+    bio: string | null
+    followers: number
+    following: number
+    posts: number
+    isPrivate: boolean
+    isVerified: boolean
   }
-}
 
-function parseInstagramHTML(html: string, username: string): InstagramProfile | null {
-  const followersMatch = html.match(/"edge_followed_by":\{"count":(\d+)\}/)
-  if (!followersMatch) return null
-
-  const followingMatch = html.match(/"edge_follow":\{"count":(\d+)\}/)
-  const postsMatch = html.match(/"edge_owner_to_timeline_media":\{"count":(\d+)\}/)
-  const nameMatch = html.match(/"full_name":"([^"]+)"/)
-  const bioMatch = html.match(/"biography":"([^"]*)"/)
-  const picMatch = html.match(/"profile_pic_url_hd":"([^"]+)"/) ||
-                   html.match(/"profile_pic_url":"([^"]+)"/)
-
-  return {
-    fullName: nameMatch ? safeJsonParse(nameMatch[1]) || username : username,
-    avatar: picMatch ? picMatch[1].replace(/\\/g, '') : null,
-    bio: bioMatch ? safeJsonParse(bioMatch[1]) : null,
-    followers: parseInt(followersMatch[1]),
-    following: followingMatch ? parseInt(followingMatch[1]) : 0,
-    posts: postsMatch ? parseInt(postsMatch[1]) : 0,
-    isPrivate: false,
+  export interface InstagramPost {
+    id: string
+    shortCode: string
+    url: string
+    imageUrl: string | null
+    videoUrl: string | null
+    caption: string | null
+    timestamp: string
+    likes: number
+    comments: number
+    isVideo: boolean
   }
-}
 
-function safeJsonParse(str: string): string {
-  try { return JSON.parse(`"${str}"`) } catch { return str }
-}
+  export interface InstagramStory {
+    id: string
+    imageUrl: string | null
+    videoUrl: string | null
+    timestamp: string
+  }
+
+  export async function fetchInstagramProfile(
+    username: string,
+    apifyToken: string
+  ): Promise<InstagramProfile | null> {
+    try {
+      const runRes = await fetch(
+        'https://api.apify.com/v2/acts/apify~instagram-profile-scraper/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apifyToken}` },
+          body: JSON.stringify({ usernames: [username] }),
+          signal: AbortSignal.timeout(10000),
+        }
+      )
+      if (!runRes.ok) return null
+      const runData = await runRes.json()
+      const runId = runData?.data?.id
+      if (!runId) return null
+      const items = await pollApifyRun(runId, apifyToken, 90)
+      if (!items || items.length === 0) return null
+      const u = items[0] as Record<string, unknown>
+      return {
+        fullName: (u.fullName as string) || (u.full_name as string) || username,
+        avatar: (u.profilePicUrl as string) || (u.profile_pic_url as string) || null,
+        bio: (u.biography as string) || (u.bio as string) || null,
+        followers: (u.followersCount as number) ?? ((u.edge_followed_by as Record<string,number>)?.count ?? 0),
+        following: (u.followsCount as number) ?? ((u.edge_follow as Record<string,number>)?.count ?? 0),
+        posts: (u.postsCount as number) ?? ((u.edge_owner_to_timeline_media as Record<string,number>)?.count ?? 0),
+        isPrivate: (u.isPrivate as boolean) ?? false,
+        isVerified: (u.verified as boolean) ?? (u.isVerified as boolean) ?? false,
+      }
+    } catch { return null }
+  }
+
+  export async function fetchInstagramPosts(
+    username: string,
+    apifyToken: string,
+    limit = 5
+  ): Promise<InstagramPost[]> {
+    try {
+      const runRes = await fetch(
+        'https://api.apify.com/v2/acts/apify~instagram-scraper/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apifyToken}` },
+          body: JSON.stringify({
+            directUrls: [`https://www.instagram.com/${username}/`],
+            resultsType: 'posts',
+            resultsLimit: limit,
+          }),
+          signal: AbortSignal.timeout(10000),
+        }
+      )
+      if (!runRes.ok) return []
+      const runData = await runRes.json()
+      const runId = runData?.data?.id
+      if (!runId) return []
+      const items = await pollApifyRun(runId, apifyToken, 120)
+      if (!items) return []
+      return items.slice(0, limit).map((item: Record<string, unknown>) => ({
+        id: String(item.id || item.shortCode || ''),
+        shortCode: String(item.shortCode || ''),
+        url: `https://www.instagram.com/p/${item.shortCode}/`,
+        imageUrl: (item.displayUrl as string) || (item.thumbnailUrl as string) || null,
+        videoUrl: (item.videoUrl as string) || null,
+        caption: (item.caption as string) || null,
+        timestamp: (item.timestamp as string) || new Date().toISOString(),
+        likes: Number(item.likesCount) || 0,
+        comments: Number(item.commentsCount) || 0,
+        isVideo: Boolean(item.isVideo),
+      }))
+    } catch { return [] }
+  }
+
+  export async function fetchInstagramStories(
+    username: string,
+    apifyToken: string
+  ): Promise<InstagramStory[]> {
+    try {
+      const runRes = await fetch(
+        'https://api.apify.com/v2/acts/apify~instagram-scraper/runs',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apifyToken}` },
+          body: JSON.stringify({
+            directUrls: [`https://www.instagram.com/stories/${username}/`],
+            resultsType: 'stories',
+            resultsLimit: 20,
+          }),
+          signal: AbortSignal.timeout(10000),
+        }
+      )
+      if (!runRes.ok) return []
+      const runData = await runRes.json()
+      const runId = runData?.data?.id
+      if (!runId) return []
+      const items = await pollApifyRun(runId, apifyToken, 120)
+      if (!items) return []
+      return items.map((item: Record<string, unknown>) => ({
+        id: String(item.id || ''),
+        imageUrl: (item.displayUrl as string) || null,
+        videoUrl: (item.videoUrl as string) || null,
+        timestamp: (item.timestamp as string) || new Date().toISOString(),
+      }))
+    } catch { return [] }
+  }
+
+  async function pollApifyRun(runId: string, token: string, timeoutSecs: number): Promise<Record<string, unknown>[] | null> {
+    const deadline = Date.now() + timeoutSecs * 1000
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 4000))
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const { data } = await statusRes.json()
+      if (data?.status === 'SUCCEEDED') {
+        const dsRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const items = await dsRes.json()
+        return Array.isArray(items) ? items : null
+      }
+      if (data?.status === 'FAILED' || data?.status === 'ABORTED') return null
+    }
+    return null
+  }
