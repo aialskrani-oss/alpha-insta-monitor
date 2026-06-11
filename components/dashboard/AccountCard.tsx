@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2, Power, ExternalLink, Users, FileText, UserCheck } from 'lucide-react'
+import { Trash2, Power, ExternalLink, Users, FileText, UserCheck, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatNumber, getStatusText, timeAgo } from '@/lib/utils'
@@ -13,11 +13,14 @@ interface AccountCardProps {
   account: Account
   onDelete: (id: string) => void
   onToggleTracking: (id: string, isTracked: boolean) => void
+  onUpdate?: (id: string, data: Partial<Account>) => void
 }
 
-export function AccountCard({ account, onDelete, onToggleTracking }: AccountCardProps) {
+export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: AccountCardProps) {
   const [loadingDelete, setLoadingDelete] = useState(false)
   const [loadingToggle, setLoadingToggle] = useState(false)
+  const [loadingSync, setLoadingSync] = useState(false)
+  const [imgError, setImgError] = useState(false)
 
   const handleDelete = async () => {
     if (!confirm(`هل أنت متأكد من حذف حساب @${account.username}؟`)) return
@@ -59,12 +62,35 @@ export function AccountCard({ account, onDelete, onToggleTracking }: AccountCard
     }
   }
 
-  const statusVariant = {
-    ACTIVE: 'success' as const,
-    INACTIVE: 'default' as const,
-    ERROR: 'danger' as const,
-    PENDING: 'warning' as const,
+  const handleSync = async () => {
+    setLoadingSync(true)
+    try {
+      const res = await fetch(`/api/accounts/${account.id}/sync`, { method: 'POST' })
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success(data.message || 'تم تحديث البيانات ✅')
+        onUpdate?.(account.id, data.data)
+      } else if (data.partial) {
+        toast.warning(data.error || 'تعذّر الاتصال بـ Instagram')
+      } else {
+        toast.error(data.error || 'فشل المزامنة')
+      }
+    } catch {
+      toast.error('خطأ في الاتصال')
+    } finally {
+      setLoadingSync(false)
+    }
   }
+
+  const statusVariant: Record<string, 'success' | 'default' | 'danger' | 'warning'> = {
+    ACTIVE: 'success',
+    INACTIVE: 'default',
+    ERROR: 'danger',
+    PENDING: 'warning',
+  }
+
+  const showAvatar = account.avatar && !imgError
 
   return (
     <div className="glass rounded-xl border border-cyber-border hover:border-ig-purple/30 transition-all duration-200 overflow-hidden group">
@@ -76,13 +102,15 @@ export function AccountCard({ account, onDelete, onToggleTracking }: AccountCard
         <div className="flex items-start gap-3 mb-4">
           {/* الصورة الشخصية */}
           <div className="relative shrink-0">
-            {account.avatar ? (
+            {showAvatar ? (
               <Image
-                src={account.avatar}
+                src={account.avatar!}
                 alt={account.username}
                 width={48}
                 height={48}
                 className="rounded-full object-cover border-2 border-ig-purple/30"
+                onError={() => setImgError(true)}
+                unoptimized
               />
             ) : (
               <div className="w-12 h-12 rounded-full ig-gradient flex items-center justify-center text-white font-bold text-lg">
@@ -100,7 +128,7 @@ export function AccountCard({ account, onDelete, onToggleTracking }: AccountCard
               <p className="font-semibold text-cyber-text truncate">
                 {account.fullName || account.username}
               </p>
-              <Badge variant={statusVariant[account.status]} size="sm" dot>
+              <Badge variant={statusVariant[account.status] || 'default'} size="sm" dot>
                 {getStatusText(account.status)}
               </Badge>
             </div>
@@ -114,6 +142,16 @@ export function AccountCard({ account, onDelete, onToggleTracking }: AccountCard
               <ExternalLink size={10} />
             </a>
           </div>
+
+          {/* زر مزامنة سريع */}
+          <button
+            onClick={handleSync}
+            disabled={loadingSync}
+            className="shrink-0 p-1.5 rounded-lg text-cyber-muted hover:text-ig-purple hover:bg-ig-purple/10 transition-all disabled:opacity-40"
+            title="مزامنة من Instagram"
+          >
+            <RefreshCw size={13} className={loadingSync ? 'animate-spin' : ''} />
+          </button>
         </div>
 
         {/* الإحصائيات */}
@@ -136,7 +174,7 @@ export function AccountCard({ account, onDelete, onToggleTracking }: AccountCard
         {/* آخر فحص */}
         {account.lastChecked && (
           <p className="text-xs text-cyber-muted mb-4">
-            آخر فحص: {timeAgo(account.lastChecked)}
+            آخر تحديث: {timeAgo(account.lastChecked)}
           </p>
         )}
 
