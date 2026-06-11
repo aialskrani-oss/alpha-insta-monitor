@@ -34,11 +34,43 @@ export default function AccountsPage() {
     }
   }
 
-  const handleRefresh = async () => {
+  // مزامنة جميع الحسابات من Instagram
+  const handleRefreshAll = async () => {
+    if (accounts.length === 0) return
     setRefreshing(true)
-    await fetchAccounts()
+
+    const toastId = toast.loading(`جارٍ مزامنة ${accounts.length} حساب من Instagram...`)
+    let success = 0
+    let failed = 0
+
+    await Promise.allSettled(
+      accounts.map(async (acc) => {
+        try {
+          const res = await fetch(`/api/accounts/${acc.id}/sync`, { method: 'POST' })
+          const data = await res.json()
+          if (data.success || data.partial) {
+            if (data.data) {
+              setAccounts((prev) =>
+                prev.map((a) => (a.id === acc.id ? { ...a, ...data.data } : a))
+              )
+            }
+            success++
+          } else {
+            failed++
+          }
+        } catch {
+          failed++
+        }
+      })
+    )
+
+    toast.dismiss(toastId)
+    if (failed === 0) {
+      toast.success(`✅ تمت مزامنة ${success} حساب`)
+    } else {
+      toast.warning(`مزامنة ${success} من أصل ${accounts.length} حساب`)
+    }
     setRefreshing(false)
-    toast.success('تم تحديث البيانات')
   }
 
   const handleDelete = (id: string) => {
@@ -48,6 +80,12 @@ export default function AccountsPage() {
   const handleToggle = (id: string, isTracked: boolean) => {
     setAccounts((prev) =>
       prev.map((a) => (a.id === id ? { ...a, isTracked } : a))
+    )
+  }
+
+  const handleUpdate = (id: string, data: Partial<Account>) => {
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...data } : a))
     )
   }
 
@@ -78,11 +116,11 @@ export default function AccountsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleRefresh}
+            onClick={handleRefreshAll}
             loading={refreshing}
             icon={<RefreshCw size={15} />}
           >
-            تحديث
+            مزامنة الكل
           </Button>
           <Button
             size="sm"
@@ -93,6 +131,14 @@ export default function AccountsPage() {
           </Button>
         </div>
       </div>
+
+      {/* إشعار توضيحي */}
+      {accounts.length > 0 && (
+        <div className="bg-ig-purple/5 border border-ig-purple/15 rounded-xl px-4 py-3 text-xs text-cyber-muted flex items-center gap-2">
+          <RefreshCw size={12} className="shrink-0 text-ig-purple" />
+          <span>اضغط أيقونة ↺ على أي حساب لجلب أحدث البيانات من Instagram مباشرة</span>
+        </div>
+      )}
 
       {/* شريط البحث */}
       {accounts.length > 0 && (
@@ -125,6 +171,7 @@ export default function AccountsPage() {
               account={account}
               onDelete={handleDelete}
               onToggleTracking={handleToggle}
+              onUpdate={handleUpdate}
             />
           ))}
         </div>
