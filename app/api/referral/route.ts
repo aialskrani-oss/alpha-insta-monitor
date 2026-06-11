@@ -15,9 +15,6 @@ export async function GET(req: NextRequest) {
 
     const codes = await prisma.referralCode.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
-        usedBy: { select: { name: true, email: true } },
-      },
     })
 
     return NextResponse.json({ success: true, data: codes })
