@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: accounts })
   } catch (error) {
-    console.error('GET /api/accounts:', error)
     return NextResponse.json({ success: false, error: 'خطأ في جلب الحسابات' }, { status: 500 })
   }
 }
@@ -53,14 +52,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'الحساب موجود بالفعل' }, { status: 409 })
     }
 
-    // محاولة جلب بيانات الحساب من Instagram
-    // جلب بيانات أولية — يحتاج Apify Token من الإعدادات
-      const settings = await prisma.settings.findFirst()
-      let accountData = null
-      if (settings?.apifyApiToken) {
-        const { fetchInstagramProfile } = await import('@/lib/instagram')
-        accountData = await fetchInstagramProfile(clean, settings.apifyApiToken).catch(() => null)
-      }
+    // جلب بيانات أولية — يستخدم Apify Token من DB أو من env var
+    const settings = await prisma.settings.findFirst()
+    const apifyToken = settings?.apifyApiToken || process.env.APIFY_API_TOKEN || null
+    let accountData = null
+    if (apifyToken) {
+      const { fetchInstagramProfile } = await import('@/lib/instagram')
+      accountData = await fetchInstagramProfile(clean, apifyToken).catch(() => null)
+    }
 
     const account = await prisma.account.create({
       data: {
@@ -89,7 +88,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: account }, { status: 201 })
   } catch (error) {
-    console.error('POST /api/accounts:', error)
     return NextResponse.json({ success: false, error: 'خطأ في إضافة الحساب' }, { status: 500 })
   }
 }
