@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/utils'
 import type { ReferralCode } from '@/types'
 
 export default function ReferralsPage() {
-  const [codes, setCodes] = useState<(ReferralCode & { usedBy?: { name: string; email: string }[] })[]>([])
+  const [codes, setCodes] = useState<ReferralCode[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
