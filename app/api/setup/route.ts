@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  // حماية بسيطة - يجب تمرير مفتاح سري
   const key = req.nextUrl.searchParams.get('key')
   if (key !== process.env.NEXTAUTH_SECRET && key !== 'setup2024') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -11,7 +10,6 @@ export async function GET(req: NextRequest) {
   try {
     const { prisma } = await import('@/lib/prisma')
 
-    // تشغيل SQL لإنشاء كل الجداول إذا لم تكن موجودة
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "users" (
         "id" TEXT NOT NULL,
@@ -40,6 +38,11 @@ export async function GET(req: NextRequest) {
         "isTracked" BOOLEAN NOT NULL DEFAULT true,
         "status" TEXT NOT NULL DEFAULT 'ACTIVE',
         "lastChecked" TIMESTAMP(3),
+        "lastPostId" TEXT,
+        "lastPostTime" TIMESTAMP(3),
+        "lastStoryId" TEXT,
+        "lastStoryTime" TIMESTAMP(3),
+        "followersAtLastSync" INTEGER NOT NULL DEFAULT 0,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "userId" TEXT NOT NULL,
@@ -47,6 +50,18 @@ export async function GET(req: NextRequest) {
         FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
       );
     `)
+
+    // إضافة الأعمدة المفقودة إن وُجد الجدول مسبقاً بدونها
+    const missingAccountCols = [
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastPostId" TEXT;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastPostTime" TIMESTAMP(3);`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastStoryId" TEXT;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastStoryTime" TIMESTAMP(3);`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "followersAtLastSync" INTEGER NOT NULL DEFAULT 0;`,
+    ]
+    for (const sql of missingAccountCols) {
+      await prisma.$executeRawUnsafe(sql).catch(() => {})
+    }
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "activities" (
@@ -92,21 +107,29 @@ export async function GET(req: NextRequest) {
         "id" TEXT NOT NULL,
         "telegramBotToken" TEXT,
         "telegramChatId" TEXT,
+        "apifyApiToken" TEXT,
         "webhookUrl" TEXT,
         "webhookEnabled" BOOLEAN NOT NULL DEFAULT false,
         "notifyOnFollow" BOOLEAN NOT NULL DEFAULT true,
         "notifyOnUnfollow" BOOLEAN NOT NULL DEFAULT true,
         "notifyOnNewPost" BOOLEAN NOT NULL DEFAULT true,
-        "checkIntervalMins" INTEGER NOT NULL DEFAULT 60,
+        "notifyOnNewStory" BOOLEAN NOT NULL DEFAULT true,
+        "notifyOnBioChange" BOOLEAN NOT NULL DEFAULT false,
+        "checkIntervalMins" INTEGER NOT NULL DEFAULT 30,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY ("id")
       );
     `)
 
-    // إضافة عمود updatedAt trigger
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
-    `).catch(() => {})
+    // إضافة الأعمدة المفقودة في settings إن وُجد الجدول مسبقاً
+    const missingSettingsCols = [
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "apifyApiToken" TEXT;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "notifyOnNewStory" BOOLEAN NOT NULL DEFAULT true;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "notifyOnBioChange" BOOLEAN NOT NULL DEFAULT false;`,
+    ]
+    for (const sql of missingSettingsCols) {
+      await prisma.$executeRawUnsafe(sql).catch(() => {})
+    }
 
     return NextResponse.json({
       success: true,
