@@ -11,131 +11,105 @@ datasource db {
 
 // نموذج المستخدمين
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   password     String
   name         String
-  role         UserRole  @default(USER)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  role         String   @default("USER")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  usedCodeId   String?
 
   // العلاقات
-  accounts     Account[]
+  accounts      Account[]
   referralCodes ReferralCode[] @relation("CodeCreator")
-  usedCode     ReferralCode?  @relation("CodeUser", fields: [usedCodeId], references: [id])
-  usedCodeId   String?
 
   @@map("users")
 }
 
-// صلاحيات المستخدمين
-enum UserRole {
-  ADMIN
-  USER
-}
-
 // نموذج حسابات إنستغرام
 model Account {
-  id           String        @id @default(cuid())
-  username     String        @unique
-  fullName     String?
-  avatar       String?
-  bio          String?
-  followers    Int           @default(0)
-  following    Int           @default(0)
-  posts        Int           @default(0)
-  isTracked    Boolean       @default(true)
-  status       AccountStatus @default(ACTIVE)
-  lastChecked  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String    @id @default(cuid())
+  username    String    @unique
+  fullName    String?
+  avatar      String?
+  bio         String?
+  followers   Int       @default(0)
+  following   Int       @default(0)
+  posts       Int       @default(0)
+  isTracked   Boolean   @default(true)
+  status      String    @default("ACTIVE")
+  lastChecked DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // العلاقات
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activities   Activity[]
-  snapshots    FollowerSnapshot[]
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities Activity[]
+  snapshots  FollowerSnapshot[]
 
   @@map("accounts")
 }
 
-// حالة الحساب
-enum AccountStatus {
-  ACTIVE
-  INACTIVE
-  ERROR
-  PENDING
-}
-
 // سجل النشاطات
 model Activity {
-  id        String       @id @default(cuid())
-  type      ActivityType
+  id        String   @id @default(cuid())
+  type      String
   message   String
   data      Json?
-  createdAt DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   // العلاقات
   accountId String
-  account   Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@map("activities")
 }
 
-// أنواع النشاطات
-enum ActivityType {
-  FOLLOWER_GAIN
-  FOLLOWER_LOSS
-  NEW_POST
-  PROFILE_CHANGE
-  STATUS_CHANGE
-  ERROR
-}
-
 // لقطات المتابعين للرسوم البيانية
 model FollowerSnapshot {
-  id        String   @id @default(cuid())
-  followers Int
-  following Int
-  posts     Int
+  id         String   @id @default(cuid())
+  followers  Int
+  following  Int
+  posts      Int
   recordedAt DateTime @default(now())
 
   // العلاقات
   accountId String
-  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@map("follower_snapshots")
 }
 
 // نموذج أكواد الإحالة
 model ReferralCode {
-  id          String    @id @default(cuid())
-  code        String    @unique
-  isUsed      Boolean   @default(false)
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(cuid())
+  code      String    @unique
+  isUsed    Boolean   @default(false)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 
   // العلاقات
-  creatorId   String
-  creator     User      @relation("CodeCreator", fields: [creatorId], references: [id])
-  usedBy      User[]    @relation("CodeUser")
+  creatorId String
+  creator   User   @relation("CodeCreator", fields: [creatorId], references: [id])
 
   @@map("referral_codes")
 }
 
 // إعدادات التطبيق
 model Settings {
-  id                 String   @id @default(cuid())
-  telegramBotToken   String?
-  telegramChatId     String?
-  webhookUrl         String?
-  webhookEnabled     Boolean  @default(false)
-  notifyOnFollow     Boolean  @default(true)
-  notifyOnUnfollow   Boolean  @default(true)
-  notifyOnNewPost    Boolean  @default(true)
-  checkIntervalMins  Int      @default(60)
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(cuid())
+  telegramBotToken  String?
+  telegramChatId    String?
+  webhookUrl        String?
+  webhookEnabled    Boolean  @default(false)
+  notifyOnFollow    Boolean  @default(true)
+  notifyOnUnfollow  Boolean  @default(true)
+  notifyOnNewPost   Boolean  @default(true)
+  checkIntervalMins Int      @default(60)
+  updatedAt         DateTime @updatedAt
 
   @@map("settings")
 }
