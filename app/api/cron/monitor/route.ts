@@ -1,4 +1,4 @@
-// Vercel Cron Job: مراقبة تلقائية كل 30 دقيقة
+// Vercel Cron Job: مراقبة تلقائية
   import { NextRequest, NextResponse } from 'next/server'
   import { prisma } from '@/lib/prisma'
   import { fetchInstagramProfile, fetchInstagramPosts, fetchInstagramStories } from '@/lib/instagram'
@@ -25,12 +25,13 @@
       if (accounts.length === 0) return NextResponse.json({ message: 'لا توجد حسابات' })
 
       const hasTelegram = !!(settings.telegramBotToken && settings.telegramChatId)
-      const results = []
+      const results: Array<Record<string, unknown>> = []
 
       for (const account of accounts) {
-        const result: Record<string, unknown> = { username: account.username, changes: [] as string[] }
+        const changes: string[] = []
+        const result: Record<string, unknown> = { username: account.username, changes }
+
         try {
-          // ─── جلب الملف الشخصي ─────────────────────────────────────────
           const profile = await fetchInstagramProfile(account.username, settings.apifyApiToken)
 
           if (profile) {
@@ -42,15 +43,14 @@
               followersAtLastSync: account.followers,
             }
 
-            // رصد تغيير المتابعين
             if (profile.followers !== account.followers) {
               const diff = profile.followers - account.followers
               if (diff > 0 && settings.notifyOnFollow && hasTelegram) {
                 await notifyFollowerGain(settings.telegramBotToken!, settings.telegramChatId!, account.username, account.followers, profile.followers, profile.avatar)
-                ;(result.changes as string[]).push(`+${diff} followers`)
+                changes.push(`+${diff} followers`)
               } else if (diff < 0 && settings.notifyOnUnfollow && hasTelegram) {
                 await notifyFollowerLoss(settings.telegramBotToken!, settings.telegramChatId!, account.username, account.followers, profile.followers)
-                ;(result.changes as string[]).push(`${diff} followers`)
+                changes.push(`${diff} followers`)
               }
               await prisma.activity.create({ data: {
                 type: diff > 0 ? 'FOLLOWER_GAIN' : 'FOLLOWER_LOSS',
@@ -60,12 +60,11 @@
               updateData.followers = profile.followers
             }
 
-            // رصد تغيير السيرة
             if (profile.bio !== account.bio && settings.notifyOnBioChange && hasTelegram) {
               await notifyBioChange(settings.telegramBotToken!, settings.telegramChatId!, account.username, account.bio, profile.bio)
-              await prisma.activity.create({ data: { type: 'PROFILE_CHANGE', message: `@${account.username} غيّر سيرته الذاتية`, accountId: account.id }})
+              await prisma.activity.create({ data: { type: 'PROFILE_CHANGE', message: `@${account.username} غيّر سيرته`, accountId: account.id }})
               updateData.bio = profile.bio
-              ;(result.changes as string[]).push('bio changed')
+              changes.push('bio changed')
             }
 
             await prisma.account.update({ where: { id: account.id }, data: updateData })
@@ -74,7 +73,6 @@
             })
           }
 
-          // ─── رصد المنشورات الجديدة ─────────────────────────────────────
           if (settings.notifyOnNewPost) {
             const posts = await fetchInstagramPosts(account.username, settings.apifyApiToken, 3)
             for (const post of posts) {
@@ -85,13 +83,12 @@
                 if (hasTelegram) await notifyNewPost(settings.telegramBotToken!, settings.telegramChatId!, account.username, post)
                 await prisma.activity.create({ data: { type: 'NEW_POST', message: `@${account.username} نشر منشوراً جديداً`, data: { url: post.url, imageUrl: post.imageUrl }, accountId: account.id }})
                 await prisma.account.update({ where: { id: account.id }, data: { lastPostId: post.id, lastPostTime: postDate }})
-                ;(result.changes as string[]).push('new post')
+                changes.push('new post')
                 break
               }
             }
           }
 
-          // ─── رصد الستوريز الجديدة ──────────────────────────────────────
           if (settings.notifyOnNewStory) {
             const stories = await fetchInstagramStories(account.username, settings.apifyApiToken)
             for (const story of stories) {
@@ -102,7 +99,7 @@
                 if (hasTelegram) await notifyNewStory(settings.telegramBotToken!, settings.telegramChatId!, account.username, story)
                 await prisma.activity.create({ data: { type: 'NEW_STORY', message: `@${account.username} نشر ستوري جديدة`, accountId: account.id }})
                 await prisma.account.update({ where: { id: account.id }, data: { lastStoryId: story.id, lastStoryTime: storyDate }})
-                ;(result.changes as string[]).push('new story')
+                changes.push('new story')
                 break
               }
             }
