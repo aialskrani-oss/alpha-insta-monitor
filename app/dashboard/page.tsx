@@ -59,7 +59,7 @@ export default function DashboardPage() {
         <StatsCard
           title="إجمالي المتابعين"
           value={stats?.totalFollowers ?? 0}
-          change={stats?.followerGrowth}
+          change={stats?.followerGrowth ?? undefined}
           changeLabel="مقارنة الأسبوع الماضي"
           icon={<TrendingUp size={18} />}
           color="orange"
@@ -95,7 +95,7 @@ export default function DashboardPage() {
             أكثر الحسابات متابعين
           </h3>
           <div className="space-y-3">
-            {stats.topAccounts.map((account, idx) => (
+            {(stats.topAccounts ?? []).map((account, idx) => (
               <div key={account.id} className="flex items-center gap-3">
                 <span className="text-xs text-cyber-muted w-5 text-center font-bold">
                   {idx + 1}
