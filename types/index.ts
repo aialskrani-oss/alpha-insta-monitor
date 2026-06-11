@@ -76,13 +76,13 @@
     checkIntervalMins: number
   }
 
-  // إحصائيات لوحة التحكم
   export interface DashboardStats {
     totalAccounts: number
     trackedAccounts: number
     totalFollowers: number
     totalFollowing: number
     totalPosts: number
+    followerGrowth?: number
     recentActivities: Activity[]
   }
   
