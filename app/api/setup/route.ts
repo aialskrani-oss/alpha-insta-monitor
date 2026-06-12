@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
       );
     `)
 
-    // إضافة الأعمدة المفقودة إن وُجد الجدول مسبقاً بدونها
     const missingAccountCols = [
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastPostId" TEXT;`,
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastPostTime" TIMESTAMP(3);`,
@@ -93,14 +92,28 @@ export async function GET(req: NextRequest) {
       CREATE TABLE IF NOT EXISTS "referral_codes" (
         "id" TEXT NOT NULL,
         "code" TEXT NOT NULL UNIQUE,
+        "label" TEXT,
         "isUsed" BOOLEAN NOT NULL DEFAULT false,
+        "maxUses" INTEGER NOT NULL DEFAULT 1,
+        "usedCount" INTEGER NOT NULL DEFAULT 0,
         "expiresAt" TIMESTAMP(3),
+        "allowedAccounts" TEXT,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "creatorId" TEXT NOT NULL,
         PRIMARY KEY ("id"),
         FOREIGN KEY ("creatorId") REFERENCES "users"("id")
       );
     `)
+
+    const missingReferralCols = [
+      `ALTER TABLE "referral_codes" ADD COLUMN IF NOT EXISTS "label" TEXT;`,
+      `ALTER TABLE "referral_codes" ADD COLUMN IF NOT EXISTS "maxUses" INTEGER NOT NULL DEFAULT 1;`,
+      `ALTER TABLE "referral_codes" ADD COLUMN IF NOT EXISTS "usedCount" INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE "referral_codes" ADD COLUMN IF NOT EXISTS "allowedAccounts" TEXT;`,
+    ]
+    for (const sql of missingReferralCols) {
+      await prisma.$executeRawUnsafe(sql).catch(() => {})
+    }
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "settings" (
@@ -121,7 +134,6 @@ export async function GET(req: NextRequest) {
       );
     `)
 
-    // إضافة الأعمدة المفقودة في settings إن وُجد الجدول مسبقاً
     const missingSettingsCols = [
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "apifyApiToken" TEXT;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "notifyOnNewStory" BOOLEAN NOT NULL DEFAULT true;`,
@@ -137,10 +149,9 @@ export async function GET(req: NextRequest) {
       tables: ['users', 'accounts', 'activities', 'follower_snapshots', 'referral_codes', 'settings']
     })
   } catch (error) {
-    const msg = String(error)
     return NextResponse.json({
       success: false,
-      error: msg,
+      error: String(error),
       hint: 'تحقق من DATABASE_URL في متغيرات Vercel'
     }, { status: 500 })
   }
