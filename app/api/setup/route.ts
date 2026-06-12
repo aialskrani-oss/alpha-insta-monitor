@@ -1,4 +1,3 @@
-// تهيئة قاعدة البيانات - إنشاء الجداول تلقائياً
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
@@ -42,7 +41,13 @@ export async function GET(req: NextRequest) {
         "lastPostTime" TIMESTAMP(3),
         "lastStoryId" TEXT,
         "lastStoryTime" TIMESTAMP(3),
+        "lastActivityTime" TIMESTAMP(3),
         "followersAtLastSync" INTEGER NOT NULL DEFAULT 0,
+        "notifyOnFollow" BOOLEAN,
+        "notifyOnUnfollow" BOOLEAN,
+        "notifyOnNewPost" BOOLEAN,
+        "notifyOnNewStory" BOOLEAN,
+        "notifyOnBioChange" BOOLEAN,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "userId" TEXT NOT NULL,
@@ -56,7 +61,13 @@ export async function GET(req: NextRequest) {
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastPostTime" TIMESTAMP(3);`,
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastStoryId" TEXT;`,
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastStoryTime" TIMESTAMP(3);`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "lastActivityTime" TIMESTAMP(3);`,
       `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "followersAtLastSync" INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "notifyOnFollow" BOOLEAN;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "notifyOnUnfollow" BOOLEAN;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "notifyOnNewPost" BOOLEAN;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "notifyOnNewStory" BOOLEAN;`,
+      `ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "notifyOnBioChange" BOOLEAN;`,
     ]
     for (const sql of missingAccountCols) {
       await prisma.$executeRawUnsafe(sql).catch(() => {})
@@ -145,8 +156,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '✅ تم إنشاء جميع الجداول بنجاح! يمكنك الآن تسجيل الدخول.',
-      tables: ['users', 'accounts', 'activities', 'follower_snapshots', 'referral_codes', 'settings']
+      message: '✅ تم إنشاء جميع الجداول وإضافة الأعمدة الجديدة بنجاح!',
+      tables: ['users', 'accounts', 'activities', 'follower_snapshots', 'referral_codes', 'settings'],
+      newColumns: ['lastActivityTime', 'notifyOnFollow', 'notifyOnUnfollow', 'notifyOnNewPost', 'notifyOnNewStory', 'notifyOnBioChange']
     })
   } catch (error) {
     return NextResponse.json({
