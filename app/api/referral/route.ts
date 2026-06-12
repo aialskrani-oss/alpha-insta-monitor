@@ -5,7 +5,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateReferralCode } from '@/lib/utils'
 
-// جلب كافة الأكواد (للمشرف فقط)
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,12 +18,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: codes })
   } catch (error) {
-    console.error('GET /api/referral:', error)
     return NextResponse.json({ success: false, error: 'خطأ في جلب الأكواد' }, { status: 500 })
   }
 }
 
-// إنشاء كود إحالة جديد
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -33,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { expiresInDays } = body
+    const { expiresInDays, label, maxUses, allowedAccounts } = body
 
     let expiresAt: Date | undefined
     if (expiresInDays && Number(expiresInDays) > 0) {
@@ -41,7 +38,6 @@ export async function POST(req: NextRequest) {
       expiresAt.setDate(expiresAt.getDate() + Number(expiresInDays))
     }
 
-    // توليد كود فريد
     let code = generateReferralCode()
     let attempts = 0
     while (attempts < 10) {
@@ -55,18 +51,46 @@ export async function POST(req: NextRequest) {
       data: {
         code,
         creatorId: session.user.id,
+        label: label || null,
+        maxUses: maxUses ? Number(maxUses) : 1,
+        usedCount: 0,
+        allowedAccounts: allowedAccounts ? JSON.stringify(allowedAccounts) : null,
         ...(expiresAt && { expiresAt }),
       },
     })
 
     return NextResponse.json({ success: true, data: referralCode }, { status: 201 })
   } catch (error) {
-    console.error('POST /api/referral:', error)
     return NextResponse.json({ success: false, error: 'خطأ في إنشاء الكود' }, { status: 500 })
   }
 }
 
-// حذف كود إحالة
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ success: false, error: 'غير مصرح' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const { id, label, maxUses, expiresAt, allowedAccounts } = body
+
+    const updated = await prisma.referralCode.update({
+      where: { id },
+      data: {
+        ...(label !== undefined && { label }),
+        ...(maxUses !== undefined && { maxUses: Number(maxUses) }),
+        ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+        ...(allowedAccounts !== undefined && { allowedAccounts: allowedAccounts ? JSON.stringify(allowedAccounts) : null }),
+      },
+    })
+
+    return NextResponse.json({ success: true, data: updated })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'خطأ في تحديث الكود' }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -79,7 +103,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('DELETE /api/referral:', error)
     return NextResponse.json({ success: false, error: 'خطأ في حذف الكود' }, { status: 500 })
   }
 }
