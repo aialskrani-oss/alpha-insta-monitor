@@ -1,7 +1,6 @@
 'use client'
-// صفحة إدارة الحسابات
 import { useEffect, useState } from 'react'
-import { Plus, Search, RefreshCw } from 'lucide-react'
+import { Plus, Search, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -15,33 +14,26 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [clearingLog, setClearingLog] = useState(false)
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
 
-  useEffect(() => {
-    fetchAccounts()
-  }, [])
+  useEffect(() => { fetchAccounts() }, [])
 
   const fetchAccounts = async () => {
     try {
       const res = await fetch('/api/accounts')
       const data = await res.json()
       if (data.success) setAccounts(data.data)
-    } catch {
-      toast.error('فشل تحميل الحسابات')
-    } finally {
-      setLoading(false)
-    }
+    } catch { toast.error('فشل تحميل الحسابات') }
+    finally { setLoading(false) }
   }
 
-  // مزامنة جميع الحسابات من Instagram
   const handleRefreshAll = async () => {
     if (accounts.length === 0) return
     setRefreshing(true)
-
     const toastId = toast.loading(`جارٍ مزامنة ${accounts.length} حساب من Instagram...`)
-    let success = 0
-    let failed = 0
+    let success = 0, failed = 0
 
     await Promise.allSettled(
       accounts.map(async (acc) => {
@@ -49,58 +41,48 @@ export default function AccountsPage() {
           const res = await fetch(`/api/accounts/${acc.id}/sync`, { method: 'POST' })
           const data = await res.json()
           if (data.success || data.partial) {
-            if (data.data) {
-              setAccounts((prev) =>
-                prev.map((a) => (a.id === acc.id ? { ...a, ...data.data } : a))
-              )
-            }
+            if (data.data) setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...data.data } : a))
             success++
-          } else {
-            failed++
-          }
-        } catch {
-          failed++
-        }
+          } else failed++
+        } catch { failed++ }
       })
     )
 
     toast.dismiss(toastId)
-    if (failed === 0) {
-      toast.success(`✅ تمت مزامنة ${success} حساب`)
-    } else {
-      toast.warning(`مزامنة ${success} من أصل ${accounts.length} حساب`)
-    }
+    if (failed === 0) toast.success(`✅ تمت مزامنة ${success} حساب`)
+    else toast.warning(`مزامنة ${success} من أصل ${accounts.length} حساب`)
     setRefreshing(false)
   }
 
-  const handleDelete = (id: string) => {
-    setAccounts((prev) => prev.filter((a) => a.id !== id))
+  const handleClearAllLogs = async () => {
+    if (!confirm('هل تريد مسح سجل نشاطات جميع الحسابات؟ لا يمكن التراجع.')) return
+    setClearingLog(true)
+    try {
+      const res = await fetch('/api/activities', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (data.success) toast.success('✅ تم مسح سجل النشاطات')
+      else toast.error(data.error || 'فشل المسح')
+    } catch { toast.error('خطأ في الاتصال') }
+    finally { setClearingLog(false) }
   }
 
-  const handleToggle = (id: string, isTracked: boolean) => {
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, isTracked } : a))
-    )
-  }
+  const handleDelete = (id: string) => setAccounts(prev => prev.filter(a => a.id !== id))
+  const handleToggle = (id: string, isTracked: boolean) =>
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, isTracked } : a))
+  const handleUpdate = (id: string, data: Partial<Account>) =>
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...data } : a))
+  const handleAddSuccess = (account: Account) => setAccounts(prev => [account, ...prev])
 
-  const handleUpdate = (id: string, data: Partial<Account>) => {
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...data } : a))
-    )
-  }
-
-  const handleAddSuccess = (account: Account) => {
-    setAccounts((prev) => [account, ...prev])
-  }
-
-  // تصفية الحسابات حسب البحث
-  const filtered = accounts.filter(
-    (a) =>
-      a.username.toLowerCase().includes(search.toLowerCase()) ||
-      (a.fullName?.toLowerCase() || '').includes(search.toLowerCase())
+  const filtered = accounts.filter(a =>
+    a.username.toLowerCase().includes(search.toLowerCase()) ||
+    (a.fullName?.toLowerCase() || '').includes(search.toLowerCase())
   )
 
-  const activeCount = accounts.filter((a) => a.isTracked).length
+  const activeCount = accounts.filter(a => a.isTracked).length
 
   return (
     <div className="space-y-5">
@@ -112,21 +94,14 @@ export default function AccountsPage() {
             {accounts.length} حساب · {activeCount} نشط
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefreshAll}
-            loading={refreshing}
-            icon={<RefreshCw size={15} />}
-          >
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="ghost" size="sm" onClick={handleClearAllLogs} loading={clearingLog} icon={<Trash2 size={14} />}>
+            مسح السجل
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleRefreshAll} loading={refreshing} icon={<RefreshCw size={15} />}>
             مزامنة الكل
           </Button>
-          <Button
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            icon={<Plus size={15} />}
-          >
+          <Button size="sm" onClick={() => setShowAddModal(true)} icon={<Plus size={15} />}>
             إضافة حساب
           </Button>
         </div>
@@ -136,7 +111,7 @@ export default function AccountsPage() {
       {accounts.length > 0 && (
         <div className="bg-ig-purple/5 border border-ig-purple/15 rounded-xl px-4 py-3 text-xs text-cyber-muted flex items-center gap-2">
           <RefreshCw size={12} className="shrink-0 text-ig-purple" />
-          <span>اضغط أيقونة ↺ على أي حساب لجلب أحدث البيانات من Instagram مباشرة</span>
+          <span>اضغط أيقونة ↺ على أي حساب لجلب أحدث البيانات · زر &quot;مسح السجل&quot; يحذف سجل النشاطات كله</span>
         </div>
       )}
 
@@ -177,7 +152,6 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* نافذة إضافة حساب */}
       <AddAccountModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
