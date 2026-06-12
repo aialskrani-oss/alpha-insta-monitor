@@ -25,7 +25,14 @@ export interface Account {
   lastPostTime?: string
   lastStoryId?: string
   lastStoryTime?: string
+  lastActivityTime?: string
   followersAtLastSync?: number
+  // إشعارات مخصصة (null = استخدم الإعداد العام)
+  notifyOnFollow?: boolean | null
+  notifyOnUnfollow?: boolean | null
+  notifyOnNewPost?: boolean | null
+  notifyOnNewStory?: boolean | null
+  notifyOnBioChange?: boolean | null
   createdAt: string
   userId: string
 }
