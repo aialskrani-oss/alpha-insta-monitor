@@ -7,7 +7,6 @@ export default withAuth(
     const { pathname } = req.nextUrl
     const token = req.nextauth.token
 
-    // إذا كان المستخدم مسجلاً ويحاول الوصول لصفحة تسجيل الدخول
     if (pathname === '/login' && token) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
@@ -24,8 +23,9 @@ export default withAuth(
         if (pathname.startsWith('/api/auth')) return true
         if (pathname.startsWith('/api/setup')) return true
         if (pathname.startsWith('/api/db-check')) return true
+        if (pathname.startsWith('/api/referral/view')) return true
+        if (pathname.startsWith('/view')) return true
 
-        // باقي الصفحات تتطلب توكن صالح
         return !!token
       },
     },
