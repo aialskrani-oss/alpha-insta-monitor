@@ -1,24 +1,23 @@
-// Vercel Cron Job: مراقبة تلقائية مع إشعارات مخصصة لكل حساب
+// Vercel Cron Job — مراقبة شاملة: ستوريات + منشورات + متابعين + خصوصية
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { fetchInstagramProfile, fetchInstagramPosts, fetchInstagramStories } from '@/lib/instagram'
-import { notifyFollowerGain, notifyFollowerLoss, notifyNewPost, notifyNewStory, notifyBioChange } from '@/lib/telegram'
+import {
+  notifyFollowerGain, notifyFollowerLoss,
+  notifyNewPost, notifyNewStory, notifyBioChange,
+  sendTelegramMessage,
+} from '@/lib/telegram'
 
 export const maxDuration = 300
 
-// دالة لتحديد ما إذا كان يجب إرسال إشعار لهذا الحساب:
-// إعداد الحساب (إذا كان غير null) يتفوق على الإعداد العام
-function resolveNotify(accountSetting: boolean | null | undefined, globalSetting: boolean | null | undefined, defaultVal = true): boolean {
+function resolveNotify(
+  accountSetting: boolean | null | undefined,
+  globalSetting: boolean | null | undefined,
+  defaultVal = true
+): boolean {
   if (accountSetting !== null && accountSetting !== undefined) return accountSetting
   if (globalSetting !== null && globalSetting !== undefined) return globalSetting
   return defaultVal
-}
-
-// حساب "آخر ظهور" من البيانات المتاحة
-function computeLastActivity(...times: (Date | null | undefined)[]): Date | null {
-  const valid = times.filter(Boolean) as Date[]
-  if (!valid.length) return null
-  return valid.reduce((a, b) => a.getTime() > b.getTime() ? a : b)
 }
 
 export async function GET(req: NextRequest) {
@@ -33,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (!apifyToken) return NextResponse.json({ message: 'Apify API غير مضبوط' })
 
     const accounts = await prisma.account.findMany({
-      where: { isTracked: true, status: 'ACTIVE' },
+      where: { isTracked: true, status: { in: ['ACTIVE', 'ERROR'] } },
     })
 
     if (accounts.length === 0) return NextResponse.json({ message: 'لا توجد حسابات للمراقبة' })
@@ -45,43 +44,39 @@ export async function GET(req: NextRequest) {
       const changes: string[] = []
       const result: Record<string, unknown> = { username: account.username, changes }
 
-      // تحديد إعدادات الإشعارات لهذا الحساب تحديداً
       const notify = {
         follow:    resolveNotify(account.notifyOnFollow,    settings?.notifyOnFollow,    true),
         unfollow:  resolveNotify(account.notifyOnUnfollow,  settings?.notifyOnUnfollow,  true),
         post:      resolveNotify(account.notifyOnNewPost,   settings?.notifyOnNewPost,   true),
         story:     resolveNotify(account.notifyOnNewStory,  settings?.notifyOnNewStory,  true),
         bio:       resolveNotify(account.notifyOnBioChange, settings?.notifyOnBioChange, false),
+        private:   resolveNotify(undefined,                 (settings as {notifyOnPrivate?: boolean})?.notifyOnPrivate ?? true, true),
       }
 
       try {
-        // ─── جلب الملف الشخصي ───────────────────────────────────────
+        const now = new Date()
+
+        // ─── 1. جلب الملف الشخصي ─────────────────────────────────────────
         const profile = await fetchInstagramProfile(account.username, apifyToken)
 
         if (profile) {
-          const now = new Date()
           const updateData: Record<string, unknown> = {
             fullName: profile.fullName,
             avatar: profile.avatar,
             following: profile.following,
             posts: profile.posts,
+            isVerified: profile.isVerified,
             lastChecked: now,
-            followersAtLastSync: account.followers,
+            status: 'ACTIVE',
           }
 
-          // ─── تغيير المتابعين ─────────────────────────────────────
+          // ─── تغيير المتابعين ─────────────────────────────────────────────
           if (profile.followers !== account.followers) {
             const diff = profile.followers - account.followers
-            if (diff > 0) {
-              if (notify.follow && hasTelegram) {
-                await notifyFollowerGain(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, account.followers, profile.followers, profile.avatar)
-              }
-              changes.push(`+${diff} متابع`)
-            } else {
-              if (notify.unfollow && hasTelegram) {
-                await notifyFollowerLoss(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, account.followers, profile.followers)
-              }
-              changes.push(`${diff} متابع`)
+            if (diff > 0 && notify.follow && hasTelegram) {
+              await notifyFollowerGain(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, account.followers, profile.followers, profile.avatar)
+            } else if (diff < 0 && notify.unfollow && hasTelegram) {
+              await notifyFollowerLoss(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, account.followers, profile.followers)
             }
             await prisma.activity.create({ data: {
               type: diff > 0 ? 'FOLLOWER_GAIN' : 'FOLLOWER_LOSS',
@@ -92,9 +87,33 @@ export async function GET(req: NextRequest) {
               accountId: account.id,
             }})
             updateData.followers = profile.followers
+            updateData.followersAtLastSync = account.followers
+            changes.push(diff > 0 ? `+${diff} متابع` : `${diff} متابع`)
           }
 
-          // ─── تغيير السيرة الذاتية ────────────────────────────────
+          // ─── تغيير الخصوصية (خاص ↔ عام) ────────────────────────────────
+          if (profile.isPrivate !== account.isPrivate) {
+            const wentPublic = !profile.isPrivate && account.isPrivate
+            const wentPrivate = profile.isPrivate && !account.isPrivate
+            if (hasTelegram && notify.private) {
+              const msg = wentPublic
+                ? `🔓 <b>تحوّل الحساب إلى عام!</b>\n\n👤 <a href="https://instagram.com/${account.username}">@${account.username}</a>\n✅ يمكن الآن رؤية منشوراته وستورياته`
+                : `🔒 <b>تحوّل الحساب إلى خاص</b>\n\n👤 <a href="https://instagram.com/${account.username}">@${account.username}</a>\n⚠️ لن تظهر منشوراته وستورياته`
+              await sendTelegramMessage(settings!.telegramBotToken!, settings!.telegramChatId!, msg)
+            }
+            await prisma.activity.create({ data: {
+              type: 'PROFILE_CHANGE',
+              message: wentPublic
+                ? `@${account.username} حوّل حسابه من خاص إلى عام 🔓`
+                : `@${account.username} حوّل حسابه من عام إلى خاص 🔒`,
+              data: { wasPrivate: account.isPrivate, isNowPrivate: profile.isPrivate },
+              accountId: account.id,
+            }})
+            updateData.isPrivate = profile.isPrivate
+            changes.push(wentPublic ? 'أصبح عاماً' : 'أصبح خاصاً')
+          }
+
+          // ─── تغيير السيرة الذاتية ─────────────────────────────────────────
           if (profile.bio !== account.bio) {
             if (notify.bio && hasTelegram) {
               await notifyBioChange(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, account.bio, profile.bio)
@@ -109,25 +128,102 @@ export async function GET(req: NextRequest) {
             changes.push('تغيير السيرة')
           }
 
-          // تحديث آخر نشاط مرصود
-          const lastActivity = computeLastActivity(
-            account.lastPostTime ? new Date(account.lastPostTime) : null,
-            account.lastStoryTime ? new Date(account.lastStoryTime) : null,
-            now
-          )
-          if (lastActivity) updateData.lastActivityTime = lastActivity
-
+          // تحديث lastActivityTime
+          updateData.lastActivityTime = now
           await prisma.account.update({ where: { id: account.id }, data: updateData })
           await prisma.followerSnapshot.create({
             data: { followers: profile.followers, following: profile.following, posts: profile.posts, accountId: account.id },
           })
-
           result.followers = profile.followers
-          result.notifySettings = notify
         }
 
-        // ─── منشورات جديدة ──────────────────────────────────────────
-        if (notify.post) {
+        // ─── 2. فحص الستوريات (إذا الحساب عام) ─────────────────────────────
+        if (!account.isPrivate) {
+          const stories = await fetchInstagramStories(account.username, apifyToken)
+
+          if (stories.length > 0) {
+            // آخر ستوري = دليل دخول المستخدم للتطبيق
+            const latestStory = stories.reduce((a, b) =>
+              new Date(a.timestamp) > new Date(b.timestamp) ? a : b
+            )
+            const latestTime = new Date(latestStory.timestamp)
+
+            // تحديث lastStoryTime و lastActivityTime
+            await prisma.account.update({ where: { id: account.id }, data: {
+              lastStoryTime: latestTime,
+              lastActivityTime: latestTime,
+            }})
+          }
+
+          // اكتشاف ستوريات جديدة
+          if (notify.story) {
+            // جلب الستوريات المحفوظة في DB لهذا الحساب
+            const knownStories = await prisma.story.findMany({
+              where: { accountId: account.id, deletedAt: null },
+              select: { id: true },
+            })
+            const knownIds = new Set(knownStories.map(s => s.id))
+            const fetchedIds = new Set(stories.map(s => s.id).filter(Boolean))
+
+            // ─── ستوريات جديدة ────────────────────────────────────────────
+            for (const story of stories) {
+              if (!story.id || knownIds.has(story.id)) continue
+              const storyDate = new Date(story.timestamp)
+              const expiresAt = new Date(storyDate.getTime() + 24 * 3600 * 1000)
+
+              // إرسال الستوري فوراً لتيليجرام
+              if (hasTelegram) await notifyNewStory(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, story)
+
+              await prisma.story.upsert({
+                where: { id: story.id },
+                create: {
+                  id: story.id,
+                  imageUrl: story.imageUrl,
+                  videoUrl: story.videoUrl,
+                  expiresAt,
+                  notified: true,
+                  accountId: account.id,
+                },
+                update: { notified: true },
+              })
+
+              await prisma.activity.create({ data: {
+                type: 'NEW_STORY',
+                message: `@${account.username} نشر ستوري جديدة`,
+                data: { imageUrl: story.imageUrl, videoUrl: story.videoUrl, timestamp: story.timestamp },
+                accountId: account.id,
+              }})
+
+              await prisma.account.update({ where: { id: account.id }, data: {
+                lastStoryId: story.id,
+                lastStoryTime: storyDate,
+                lastActivityTime: storyDate,
+              }})
+
+              changes.push('ستوري جديدة')
+            }
+
+            // ─── ستوريات محذوفة ────────────────────────────────────────────
+            for (const knownId of knownIds) {
+              if (!fetchedIds.has(knownId)) {
+                await prisma.story.update({
+                  where: { id: knownId },
+                  data: { deletedAt: now },
+                })
+                if (hasTelegram) {
+                  await sendTelegramMessage(
+                    settings!.telegramBotToken!, settings!.telegramChatId!,
+                    `🗑️ <b>ستوري محذوفة</b>\n\n👤 <a href="https://instagram.com/${account.username}">@${account.username}</a>\nتم حذف ستوري قبل انتهاء 24 ساعة`
+                  )
+                }
+                changes.push('ستوري محذوفة')
+              }
+            }
+          }
+        }
+
+        // ─── 3. فحص المنشورات ────────────────────────────────────────────────
+        if (!account.isPrivate && notify.post) {
           const posts = await fetchInstagramPosts(account.username, apifyToken, 3)
           for (const post of posts) {
             if (!post.id) continue
@@ -141,7 +237,6 @@ export async function GET(req: NextRequest) {
                 data: { url: post.url, imageUrl: post.imageUrl, likes: post.likes, isVideo: post.isVideo },
                 accountId: account.id,
               }})
-              // تحديث آخر نشاط
               await prisma.account.update({ where: { id: account.id }, data: {
                 lastPostId: post.id,
                 lastPostTime: postDate,
@@ -153,40 +248,14 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // ─── ستوريز جديدة ──────────────────────────────────────────
-        if (notify.story) {
-          const stories = await fetchInstagramStories(account.username, apifyToken)
-          for (const story of stories) {
-            if (!story.id) continue
-            const storyDate = new Date(story.timestamp)
-            const lastKnown = account.lastStoryTime ? new Date(account.lastStoryTime) : null
-            if (story.id !== account.lastStoryId && (!lastKnown || storyDate > lastKnown)) {
-              if (hasTelegram) await notifyNewStory(settings!.telegramBotToken!, settings!.telegramChatId!, account.username, story)
-              await prisma.activity.create({ data: {
-                type: 'NEW_STORY',
-                message: `@${account.username} نشر ستوري جديدة`,
-                data: { imageUrl: story.imageUrl, videoUrl: story.videoUrl, timestamp: story.timestamp },
-                accountId: account.id,
-              }})
-              // الستوري = دليل قوي على أن الشخص كان على الإنستقرام مؤخراً
-              await prisma.account.update({ where: { id: account.id }, data: {
-                lastStoryId: story.id,
-                lastStoryTime: storyDate,
-                lastActivityTime: storyDate,
-              }})
-              changes.push('ستوري جديدة')
-              break
-            }
-          }
-        }
-
       } catch (err) {
         result.error = String(err)
         await prisma.account.update({ where: { id: account.id }, data: { status: 'ERROR', lastChecked: new Date() } })
       }
 
       results.push(result)
-      await new Promise(r => setTimeout(r, 2000))
+      // تأخير بين الحسابات لتجنب Rate Limiting
+      await new Promise(r => setTimeout(r, 2500))
     }
 
     return NextResponse.json({ success: true, processed: accounts.length, results })
