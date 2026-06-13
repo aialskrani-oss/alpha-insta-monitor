@@ -202,8 +202,8 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
               <p className="font-semibold text-cyber-text text-sm truncate max-w-[110px]">
                 {account.fullName || account.username}
               </p>
-              {account.isVerified && <Shield size={11} className="text-blue-400 shrink-0" title="موثّق" />}
-              {account.isPrivate && <Lock size={10} className="text-yellow-400 shrink-0" title="حساب خاص" />}
+              {account.isVerified && <Shield size={11} className="text-blue-400 shrink-0" aria-label="موثّق" />}
+              {account.isPrivate && <Lock size={10} className="text-yellow-400 shrink-0" aria-label="حساب خاص" />}
               <Badge variant={statusVariant[account.status] || 'default'} size="sm" dot>
                 {getStatusText(account.status)}
               </Badge>
