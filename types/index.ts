@@ -19,6 +19,8 @@ export interface Account {
   following: number
   posts: number
   isTracked: boolean
+  isPrivate: boolean
+  isVerified: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'PENDING'
   lastChecked?: string
   lastPostId?: string
