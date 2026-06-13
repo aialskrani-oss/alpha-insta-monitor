@@ -18,13 +18,16 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
 
-        // السماح بهذه المسارات دون مصادقة
+        // ─── مسارات مفتوحة بدون مصادقة ─────────────────────────────
         if (pathname === '/login') return true
         if (pathname.startsWith('/api/auth')) return true
         if (pathname.startsWith('/api/setup')) return true
         if (pathname.startsWith('/api/db-check')) return true
         if (pathname.startsWith('/api/referral/view')) return true
         if (pathname.startsWith('/view')) return true
+
+        // ─── Vercel Cron Jobs — يرسل CRON_SECRET لا NextAuth token ──
+        if (pathname.startsWith('/api/cron')) return true
 
         return !!token
       },
