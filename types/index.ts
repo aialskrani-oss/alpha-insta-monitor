@@ -110,3 +110,18 @@ export interface DashboardStats {
     status: string
   }>
 }
+
+export interface Comment {
+  id: string
+  commentId: string
+  mediaId: string
+  text: string
+  timestamp: string
+  mediaOwner?: string | null
+  createdAt: string
+  accountId: string
+  account?: {
+    username: string
+    avatar?: string | null
+  }
+}
