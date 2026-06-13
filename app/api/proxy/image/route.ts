@@ -1,57 +1,63 @@
-// Proxy صور Instagram لتجاوز CORS
+// بروكسي لصور Instagram لتجاوز CORS وحماية رموز الوصول
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
+// الأنواع المسموح بها لتجنب إساءة الاستخدام
+const ALLOWED_HOSTS = [
+  'instagram.com',
+  'cdninstagram.com',
+  'fbcdn.net',
+  'scontent',
+  'lookaside.instagram.com',
+  'lookaside.fbsbx.com',
+]
+
+function isAllowedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return ALLOWED_HOSTS.some(h => parsed.hostname.includes(h))
+  } catch {
+    return false
+  }
+}
+
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url')
+
   if (!url) {
-    return new NextResponse(null, { status: 400 })
+    return new NextResponse('Missing url parameter', { status: 400 })
   }
 
-  // تحقق أن الرابط من Instagram CDN أو مصادر موثوقة فقط
-  const allowedHosts = [
-    'instagram.com', 'cdninstagram.com', 'fbcdn.net',
-    'scontent', 'lookaside.fbsbx.com', 'static.cdninstagram.com',
-  ]
-  let parsedUrl: URL
-  try {
-    parsedUrl = new URL(url)
-  } catch {
-    return new NextResponse(null, { status: 400 })
-  }
-
-  const isAllowed = allowedHosts.some(h => parsedUrl.hostname.includes(h))
-  if (!isAllowed) {
-    return new NextResponse(null, { status: 403 })
+  // التحقق من المضيف المسموح به
+  if (!isAllowedUrl(url)) {
+    return new NextResponse('Forbidden host', { status: 403 })
   }
 
   try {
-    const res = await fetch(url, {
+    const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram/295.0',
-        'Accept': 'image/webp,image/avif,image/*,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'User-Agent': 'Mozilla/5.0 (compatible; AlphaMonitor/1.0)',
         'Referer': 'https://www.instagram.com/',
       },
-      signal: AbortSignal.timeout(8000),
+      // لا نُرسل cookies للخارج
     })
 
-    if (!res.ok) {
-      return new NextResponse(null, { status: res.status })
+    if (!response.ok) {
+      return new NextResponse('Image not found', { status: 404 })
     }
 
-    const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+    const buffer = await response.arrayBuffer()
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=7200, s-maxage=86400',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
         'Access-Control-Allow-Origin': '*',
       },
     })
   } catch {
-    return new NextResponse(null, { status: 502 })
+    return new NextResponse('Failed to fetch image', { status: 500 })
   }
 }
