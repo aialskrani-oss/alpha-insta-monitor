@@ -42,9 +42,8 @@ model Account {
   lastStoryId         String?
   lastStoryTime       DateTime?
   lastActivityTime    DateTime?
-  activeStoryIds      String?   // JSON: آيدي الستوريات الحالية لكشف الحذف
+  activeStoryIds      String?
   followersAtLastSync Int @default(0)
-  // إشعارات مخصصة لكل حساب (null = استخدم الإعداد العام)
   notifyOnFollow    Boolean?
   notifyOnUnfollow  Boolean?
   notifyOnNewPost   Boolean?
@@ -57,14 +56,15 @@ model Account {
   activities Activity[]
   snapshots  FollowerSnapshot[]
   stories    Story[]
+  comments   Comment[]
   @@map("accounts")
 }
 
 model Story {
-  id         String   @id // Instagram Story ID
+  id         String   @id
   imageUrl   String?
   videoUrl   String?
-  expiresAt  DateTime // timestamp + 24h
+  expiresAt  DateTime
   notified   Boolean  @default(false)
   deletedAt  DateTime?
   createdAt  DateTime @default(now())
@@ -93,6 +93,19 @@ model FollowerSnapshot {
   accountId String
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   @@map("follower_snapshots")
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  commentId   String   @unique
+  mediaId     String
+  text        String
+  timestamp   DateTime
+  mediaOwner  String?
+  createdAt   DateTime @default(now())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@map("comments")
 }
 
 model ReferralCode {
