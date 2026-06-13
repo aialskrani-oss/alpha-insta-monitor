@@ -9,6 +9,7 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatNumber, getStatusText, timeAgo } from '@/lib/utils'
+import Link from 'next/link'
 import type { Account } from '@/types'
 
 // proxy URL لإصلاح صور Instagram
@@ -238,6 +239,10 @@ export function AccountCard({ account, onDelete, onToggleTracking, onUpdate }: A
               className="p-1.5 rounded-lg text-cyber-muted hover:text-ig-purple hover:bg-ig-purple/10 transition-all disabled:opacity-40" title="مزامنة من Instagram">
               <RefreshCw size={12} className={loadingSync ? 'animate-spin' : ''} />
             </button>
+            <Link href={`/dashboard/accounts/${account.id}`}
+              className="p-1.5 rounded-lg text-cyber-muted hover:text-ig-pink hover:bg-ig-pink/10 transition-all" title="عرض التفاصيل الكاملة">
+              <Eye size={12} />
+            </Link>
           </div>
         </div>
 
