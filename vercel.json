@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/comments",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/advanced-monitor",
+      "schedule": "0 0 * * *"
     }
   ]
 }
