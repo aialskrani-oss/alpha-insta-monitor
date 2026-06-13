@@ -125,3 +125,28 @@ export interface Comment {
     avatar?: string | null
   }
 }
+
+export interface FollowerChange {
+  id: string
+  oldCount: number
+  newCount: number
+  change: number
+  recordedAt: string
+  accountId: string
+  account?: {
+    username: string
+    avatar?: string | null
+  }
+}
+
+export interface AdvancedMetrics {
+  mediaId: string
+  likeCount: number
+  commentsCount: number
+  mediaType: string
+  timestamp: string
+  caption?: string | null
+  reach?: number | null
+  saved?: number | null
+  videoViews?: number | null
+}
