@@ -162,12 +162,12 @@ export async function GET(req: NextRequest) {
               where: { accountId: account.id, deletedAt: null },
               select: { id: true },
             })
-            const knownIds = new Set(knownStories.map(s => s.id))
+            const knownIds = knownStories.map(s => s.id)
             const fetchedIds = new Set(stories.map(s => s.id).filter(Boolean))
 
             // ─── ستوريات جديدة ────────────────────────────────────────────
             for (const story of stories) {
-              if (!story.id || knownIds.has(story.id)) continue
+              if (!story.id || knownIds.includes(story.id)) continue
               const storyDate = new Date(story.timestamp)
               const expiresAt = new Date(storyDate.getTime() + 24 * 3600 * 1000)
 
