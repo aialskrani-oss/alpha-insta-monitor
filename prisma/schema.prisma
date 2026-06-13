@@ -49,14 +49,23 @@ model Account {
   notifyOnNewPost   Boolean?
   notifyOnNewStory  Boolean?
   notifyOnBioChange Boolean?
+  // حقول المراقبة المتطورة
+  lastPostDetectedAt      DateTime?
+  lastReelDetectedAt      DateTime?
+  lastBioChangeAt         DateTime?
+  lastPpChangeAt          DateTime?
+  lastVisibilityChangeAt  DateTime?
+  bioHistory              Json?
+  ppHistory               Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId     String
   user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  activities Activity[]
-  snapshots  FollowerSnapshot[]
-  stories    Story[]
-  comments   Comment[]
+  activities      Activity[]
+  snapshots       FollowerSnapshot[]
+  stories         Story[]
+  comments        Comment[]
+  followerChanges FollowerChange[]
   @@map("accounts")
 }
 
@@ -93,6 +102,17 @@ model FollowerSnapshot {
   accountId String
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   @@map("follower_snapshots")
+}
+
+model FollowerChange {
+  id         String   @id @default(cuid())
+  oldCount   Int
+  newCount   Int
+  change     Int
+  recordedAt DateTime @default(now())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@map("follower_changes")
 }
 
 model Comment {
