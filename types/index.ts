@@ -13,8 +13,8 @@ export interface Account {
   id: string
   username: string
   fullName?: string
-  avatar?: string
-  bio?: string
+  avatar?: string | null
+  bio?: string | null
   followers: number
   following: number
   posts: number
@@ -22,12 +22,13 @@ export interface Account {
   isPrivate: boolean
   isVerified: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'PENDING'
-  lastChecked?: string
-  lastPostId?: string
-  lastPostTime?: string
-  lastStoryId?: string
-  lastStoryTime?: string
-  lastActivityTime?: string
+  lastChecked?: string | null
+  lastPostId?: string | null
+  lastPostTime?: string | null
+  lastStoryId?: string | null
+  lastStoryTime?: string | null
+  lastActivityTime?: string | null
+  activeStoryIds?: string | null
   followersAtLastSync?: number
   // إشعارات مخصصة (null = استخدم الإعداد العام)
   notifyOnFollow?: boolean | null
@@ -35,7 +36,16 @@ export interface Account {
   notifyOnNewPost?: boolean | null
   notifyOnNewStory?: boolean | null
   notifyOnBioChange?: boolean | null
+  // حقول المراقبة المتطورة
+  lastPostDetectedAt?: string | null
+  lastReelDetectedAt?: string | null
+  lastBioChangeAt?: string | null
+  lastPpChangeAt?: string | null
+  lastVisibilityChangeAt?: string | null
+  bioHistory?: Array<{ bio: string | null; changedAt: string }> | null
+  ppHistory?: Array<{ url: string | null; changedAt: string }> | null
   createdAt: string
+  updatedAt?: string
   userId: string
 }
 
@@ -48,7 +58,7 @@ export interface Activity {
   accountId: string
   account?: {
     username: string
-    avatar?: string
+    avatar?: string | null
   }
 }
 
@@ -59,6 +69,46 @@ export interface FollowerSnapshot {
   posts: number
   recordedAt: string
   accountId: string
+}
+
+export interface FollowerChange {
+  id: string
+  oldCount: number
+  newCount: number
+  change: number
+  recordedAt: string
+  accountId: string
+  account?: {
+    username: string
+    avatar?: string | null
+  }
+}
+
+export interface AdvancedMetrics {
+  mediaId: string
+  likeCount: number
+  commentsCount: number
+  mediaType: string
+  timestamp: string
+  caption?: string | null
+  reach?: number | null
+  saved?: number | null
+  videoViews?: number | null
+}
+
+export interface Comment {
+  id: string
+  commentId: string
+  mediaId: string
+  text: string
+  timestamp: string
+  mediaOwner?: string | null
+  createdAt: string
+  accountId: string
+  account?: {
+    username: string
+    avatar?: string | null
+  }
 }
 
 export interface ReferralCode {
@@ -90,6 +140,20 @@ export interface Settings {
   checkIntervalMins: number
 }
 
+export interface TopAccount {
+  id: string
+  username: string
+  fullName?: string | null
+  avatar?: string | null
+  followers: number
+  following: number
+  posts: number
+  isTracked: boolean
+  isPrivate: boolean
+  isVerified: boolean
+  status: string
+}
+
 export interface DashboardStats {
   totalAccounts: number
   trackedAccounts: number
@@ -98,55 +162,5 @@ export interface DashboardStats {
   totalPosts: number
   followerGrowth?: number
   recentActivities: Activity[]
-  topAccounts?: Array<{
-    id: string
-    username: string
-    fullName?: string
-    avatar?: string
-    followers: number
-    following: number
-    posts: number
-    isTracked: boolean
-    status: string
-  }>
-}
-
-export interface Comment {
-  id: string
-  commentId: string
-  mediaId: string
-  text: string
-  timestamp: string
-  mediaOwner?: string | null
-  createdAt: string
-  accountId: string
-  account?: {
-    username: string
-    avatar?: string | null
-  }
-}
-
-export interface FollowerChange {
-  id: string
-  oldCount: number
-  newCount: number
-  change: number
-  recordedAt: string
-  accountId: string
-  account?: {
-    username: string
-    avatar?: string | null
-  }
-}
-
-export interface AdvancedMetrics {
-  mediaId: string
-  likeCount: number
-  commentsCount: number
-  mediaType: string
-  timestamp: string
-  caption?: string | null
-  reach?: number | null
-  saved?: number | null
-  videoViews?: number | null
+  topAccounts?: TopAccount[]
 }
