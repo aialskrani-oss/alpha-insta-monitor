@@ -33,6 +33,8 @@ model Account {
   following   Int       @default(0)
   posts       Int       @default(0)
   isTracked   Boolean   @default(true)
+  isPrivate   Boolean   @default(false)
+  isVerified  Boolean   @default(false)
   status      String    @default("ACTIVE")
   lastChecked DateTime?
   lastPostId          String?
@@ -40,6 +42,7 @@ model Account {
   lastStoryId         String?
   lastStoryTime       DateTime?
   lastActivityTime    DateTime?
+  activeStoryIds      String?   // JSON: آيدي الستوريات الحالية لكشف الحذف
   followersAtLastSync Int @default(0)
   // إشعارات مخصصة لكل حساب (null = استخدم الإعداد العام)
   notifyOnFollow    Boolean?
@@ -53,7 +56,21 @@ model Account {
   user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   activities Activity[]
   snapshots  FollowerSnapshot[]
+  stories    Story[]
   @@map("accounts")
+}
+
+model Story {
+  id         String   @id // Instagram Story ID
+  imageUrl   String?
+  videoUrl   String?
+  expiresAt  DateTime // timestamp + 24h
+  notified   Boolean  @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  accountId  String
+  account    Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@map("stories")
 }
 
 model Activity {
@@ -105,6 +122,7 @@ model Settings {
   notifyOnNewPost   Boolean  @default(true)
   notifyOnNewStory  Boolean  @default(true)
   notifyOnBioChange Boolean  @default(false)
+  notifyOnPrivate   Boolean  @default(true)
   checkIntervalMins Int      @default(30)
   updatedAt         DateTime @updatedAt
   @@map("settings")
