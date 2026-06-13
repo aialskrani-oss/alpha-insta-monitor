@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = session.user.id
-
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
 
@@ -28,19 +27,17 @@ export async function GET(req: NextRequest) {
           following: true,
           posts: true,
           isTracked: true,
+          isPrivate: true,
+          isVerified: true,
           status: true,
         },
       }),
       prisma.activity.findMany({
-        where: {
-          account: { userId },
-        },
+        where: { account: { userId } },
         orderBy: { createdAt: 'desc' },
         take: 20,
         include: {
-          account: {
-            select: { username: true, avatar: true },
-          },
+          account: { select: { username: true, avatar: true } },
         },
       }),
       prisma.followerSnapshot.findMany({
@@ -53,13 +50,13 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0)
-    const totalFollowing = accounts.reduce((sum, a) => sum + a.following, 0)
-    const totalPosts = accounts.reduce((sum, a) => sum + a.posts, 0)
-    const trackedAccounts = accounts.filter((a) => a.isTracked).length
+    const totalFollowers  = accounts.reduce((sum, a) => sum + a.followers, 0)
+    const totalFollowing  = accounts.reduce((sum, a) => sum + a.following, 0)
+    const totalPosts      = accounts.reduce((sum, a) => sum + a.posts, 0)
+    const trackedAccounts = accounts.filter(a => a.isTracked).length
 
     // حساب نمو المتابعين الفعلي مقارنةً بأسبوع مضى
-    const oldTotal = oldSnapshots.reduce((sum, s) => sum + s.followers, 0)
+    const oldTotal      = oldSnapshots.reduce((sum, s) => sum + s.followers, 0)
     const followerGrowth = oldSnapshots.length > 0 ? totalFollowers - oldTotal : 0
 
     return NextResponse.json({
