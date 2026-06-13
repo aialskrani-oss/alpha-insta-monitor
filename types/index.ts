@@ -86,6 +86,7 @@ export interface Settings {
   notifyOnNewPost: boolean
   notifyOnNewStory: boolean
   notifyOnBioChange: boolean
+  notifyOnPrivate: boolean
   checkIntervalMins: number
 }
 
